@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/connectionDB.js');
+const errorHandler = require('./middleware/errorHandler.js');
 
 dotenv.config();
 const app = express();
@@ -16,9 +17,12 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 5002;
 
-connectDB(); 
+connectDB();
 app.use('/recipe', require('./routes/recipeRoutes.js'));
+app.use('/auth', require('./routes/authRoutes.js'));
+
+app.use(errorHandler);
 
 app.listen(PORT, (err) => {
-    console.log("Server listening at "+ PORT);
-})
+    console.log("Server listening at " + PORT);
+});

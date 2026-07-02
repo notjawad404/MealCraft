@@ -23,7 +23,15 @@ const recipeSchema = mongoose.Schema({
     username:{
         type: String,
         required: true
-    }
+    },
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    },
+    isPublic: {
+        type: Boolean,
+        default: true,
+    },
 }, {timestamps: true});
 
 module.exports = mongoose.model('Recipes', recipeSchema);
