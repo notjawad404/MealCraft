@@ -143,7 +143,7 @@ export default function Home() {
                   90 min
                 </span>
                 <span className="h-1 w-1 rounded-full bg-ink-300 dark:bg-night-600" aria-hidden="true" />
-                <span>by Ayesha</span>
+                <span>by User</span>
               </div>
 
               <div className="mt-5 flex flex-wrap gap-2 border-t border-ink-100 pt-5 dark:border-night-700">

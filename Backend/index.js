@@ -5,24 +5,46 @@ const connectDB = require('./config/connectionDB.js');
 const errorHandler = require('./middleware/errorHandler.js');
 
 dotenv.config();
+
+// Node's resolver sometimes falls back to 127.0.0.1 instead of reading the
+// adapter's DNS config, which breaks the SRV lookup a mongodb+srv:// URI needs.
+// Set DNS_SERVERS in .env to point it somewhere that works. Unset = OS default.
+if (process.env.DNS_SERVERS) {
+    require('dns').setServers(process.env.DNS_SERVERS.split(',').map((s) => s.trim()));
+}
+
 const app = express();
-app.use(express.json());
+
+// CORS must be registered before the body parser: a malformed JSON body is
+// rejected by express.json() and sent straight to the error handler, so any
+// middleware after it never runs. Without the headers already set, the browser
+// reports an opaque CORS failure instead of the real 400.
 app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173']
+    origin: process.env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim()) || ['http://localhost:5173']
 }));
+app.use(express.json());
 
 app.get('/', (req, res) => {
     res.send('API is running...');
 });
 
-const PORT = process.env.PORT || 5002;
-
-connectDB();
 app.use('/recipe', require('./routes/recipeRoutes.js'));
 app.use('/auth', require('./routes/authRoutes.js'));
 
 app.use(errorHandler);
 
-app.listen(PORT, (err) => {
-    console.log("Server listening at " + PORT);
-});
+const PORT = process.env.PORT || 5002;
+
+// Only accept traffic once the database is actually reachable. Serving requests
+// without it just turns every route into a 10s buffering timeout, which reads
+// like an application bug rather than a connection failure.
+connectDB()
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`Server listening at ${PORT}`);
+        });
+    })
+    .catch(() => {
+        console.error('Server not started.\n');
+        process.exit(1);
+    });
