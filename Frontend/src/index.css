@@ -1,3 +1,133 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-paper-50 text-ink-800 antialiased transition-colors duration-300;
+    font-feature-settings: 'kern', 'liga', 'calt';
+  }
+
+  .dark body {
+    @apply bg-night-900 text-ink-100;
+  }
+
+  h1, h2, h3 {
+    @apply font-display;
+    font-optical-sizing: auto;
+  }
+
+  ::selection {
+    @apply bg-ember-200 text-ember-900;
+  }
+
+  .dark ::selection {
+    @apply bg-ember-700 text-paper-50;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-ember-500 ring-offset-2 ring-offset-paper-50;
+  }
+
+  .dark :focus-visible {
+    @apply ring-offset-night-900;
+  }
+}
+
+@layer components {
+  /* ---- Layout helpers ---- */
+  .shell {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+
+  .surface {
+    @apply border border-ink-200 bg-white dark:border-night-600 dark:bg-night-800;
+  }
+
+  .rule {
+    @apply border-ink-200 dark:border-night-600;
+  }
+
+  /* ---- Typography ---- */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-ultra text-ember-700 dark:text-ember-300;
+  }
+
+  .lede {
+    @apply text-lg leading-relaxed text-ink-600 dark:text-ink-300 sm:text-xl;
+  }
+
+  .muted {
+    @apply text-ink-500 dark:text-ink-400;
+  }
+
+  /* ---- Buttons ---- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3
+           text-sm font-semibold tracking-tight
+           transition-all duration-200 ease-out;
+  }
+
+  .btn-primary {
+    @apply btn bg-ember-600 text-paper-50 shadow-card
+           hover:-translate-y-0.5 hover:bg-ember-700 hover:shadow-lift
+           active:translate-y-0
+           dark:bg-ember-500 dark:hover:bg-ember-400 dark:hover:text-night-900;
+  }
+
+  .btn-ghost {
+    @apply btn border border-ink-300 bg-transparent text-ink-800
+           hover:-translate-y-0.5 hover:border-ink-800 hover:bg-white
+           active:translate-y-0
+           dark:border-night-600 dark:text-ink-100 dark:hover:border-ink-300 dark:hover:bg-night-800;
+  }
+
+  .btn-invert {
+    @apply btn bg-paper-50 text-ink-900 shadow-card
+           hover:-translate-y-0.5 hover:bg-white hover:shadow-lift active:translate-y-0;
+  }
+
+  /* ---- Forms ---- */
+  .label {
+    @apply mb-2 block text-xs font-semibold uppercase tracking-widest text-ink-600 dark:text-ink-300;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-[15px] leading-relaxed
+           text-ink-900 placeholder:text-ink-400
+           transition-colors duration-150
+           focus:border-ember-500 focus:outline-none focus:ring-4 focus:ring-ember-500/15
+           dark:border-night-600 dark:bg-night-900 dark:text-ink-50 dark:placeholder:text-ink-500
+           dark:focus:border-ember-400 dark:focus:ring-ember-400/20;
+  }
+
+  /* ---- Decorative ---- */
+  .grain {
+    @apply pointer-events-none absolute inset-0 bg-grain opacity-[0.035] mix-blend-multiply;
+  }
+
+  .dark .grain {
+    @apply opacity-[0.05] mix-blend-screen;
+  }
+
+  .link-underline {
+    @apply relative inline-block after:absolute after:-bottom-0.5 after:left-0 after:h-px
+           after:w-0 after:bg-current after:transition-all after:duration-300
+           hover:after:w-full;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
