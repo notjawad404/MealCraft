@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 
-/** Extra guidance for failure modes that are easy to misread as app bugs. */
 const diagnose = (err) => {
     if (err.syscall === 'querySrv' && err.code === 'ECONNREFUSED') {
         const servers = require('dns').getServers().join(', ');
@@ -26,22 +25,36 @@ const diagnose = (err) => {
     return '';
 };
 
+// A warm serverless instance handles many requests, and each one calls
+// connectDB(). Caching the promise on the module keeps that to one connection
+// per instance instead of one per request, which would exhaust the Atlas
+// connection limit. Cleared on failure so the next request can retry.
+let connection = null;
+
 const connectDB = async () => {
     if (!process.env.CONNECTION_STRING) {
         throw new Error('CONNECTION_STRING is not set. Check Backend/.env');
     }
 
-    try {
-        await mongoose.connect(process.env.CONNECTION_STRING, {
+    if (connection) return connection;
+
+    connection = mongoose
+        .connect(process.env.CONNECTION_STRING, {
             serverSelectionTimeoutMS: 8000,
+        })
+        .then((m) => {
+            console.log('Connected to MongoDB');
+            return m;
+        })
+        .catch((err) => {
+            connection = null;
+            console.error(`\nCould not connect to MongoDB: ${err.message}`);
+            const hint = diagnose(err);
+            if (hint) console.error(hint);
+            throw err;
         });
-        console.log('Connected to MongoDB');
-    } catch (err) {
-        console.error(`\nCould not connect to MongoDB: ${err.message}`);
-        const hint = diagnose(err);
-        if (hint) console.error(hint);
-        throw err;
-    }
+
+    return connection;
 };
 
 module.exports = connectDB;
