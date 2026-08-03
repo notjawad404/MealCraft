@@ -20,7 +20,24 @@ const app = express();
 // middleware after it never runs. Without the headers already set, the browser
 // reports an opaque CORS failure instead of the real 400.
 app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim()) || ['http://localhost:5173']
+    origin: (origin, callback) => {
+        console.log("Incoming Origin:", origin);
+
+        const allowedOrigins = process.env.ALLOWED_ORIGINS
+            ?.split(',')
+            .map(o => o.trim());
+
+        console.log("Allowed Origins:", allowedOrigins);
+
+        if (!origin || allowedOrigins.includes(origin)) {
+            console.log("✅ CORS Allowed");
+            callback(null, true);
+        } else {
+            console.log("❌ CORS Blocked:", origin);
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    credentials: true
 }));
 // Recipe images ride along in the JSON body as base64 data URIs, which sails
 // past body-parser's 100 kB default. The ceiling sits above the per-image limit
