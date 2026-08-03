@@ -1,0 +1,333 @@
+[
+  {
+    "title": "Lemon & Herb Roast Chicken",
+    "time": 90,
+    "isPublic": true,
+    "ingredients": ["1.6 kg whole chicken", "2 lemons", "4 sprigs thyme", "1 bulb garlic", "3 tbsp olive oil", "Flaky salt and black pepper"],
+    "instructions": [
+      "Heat the oven to 200°C fan.",
+      "Halve one lemon and push it into the cavity with the thyme and the garlic bulb, cut across the middle.",
+      "Rub the skin with oil, the juice of the second lemon, salt and plenty of pepper.",
+      "Roast for 70 minutes, basting once at the halfway mark.",
+      "Rest for 15 minutes before carving — this is not optional."
+    ]
+  },
+  {
+    "title": "Overnight Oats with Berries",
+    "time": 5,
+    "isPublic": true,
+    "ingredients": ["60 g rolled oats", "120 ml milk or oat milk", "2 tbsp yoghurt", "1 tsp honey", "Handful of berries", "Pinch of salt"],
+    "instructions": [
+      "Stir the oats, milk, yoghurt, honey and salt together in a jar.",
+      "Seal and refrigerate overnight.",
+      "Top with berries in the morning."
+    ]
+  },
+  {
+    "title": "Slow-Cooked Beef Short Rib",
+    "time": 300,
+    "isPublic": true,
+    "ingredients": ["1.5 kg beef short rib", "1 bottle red wine", "2 onions", "3 carrots", "2 tbsp tomato purée", "500 ml beef stock", "2 bay leaves"],
+    "instructions": [
+      "Heat the oven to 140°C fan.",
+      "Brown the ribs hard on every side in a casserole, then set aside.",
+      "Soften the chopped onions and carrots, stir in the tomato purée and cook for two minutes.",
+      "Pour in the wine and reduce by half, then return the ribs with the stock and bay.",
+      "Cover and cook for four hours, until the meat gives way to a spoon.",
+      "Skim the fat and reduce the sauce if it needs tightening."
+    ]
+  },
+  {
+    "title": "Miso Glazed Aubergine",
+    "time": 35,
+    "isPublic": true,
+    "ingredients": ["2 aubergines", "3 tbsp white miso", "2 tbsp mirin", "1 tbsp sake", "1 tbsp sugar", "Sesame seeds", "2 spring onions"],
+    "instructions": [
+      "Halve the aubergines and score the flesh in a diamond pattern.",
+      "Brush with oil and roast at 200°C for 20 minutes, cut side up.",
+      "Whisk the miso, mirin, sake and sugar into a glaze.",
+      "Spoon it over the aubergines and grill for 5 minutes until blistered.",
+      "Finish with sesame seeds and sliced spring onion."
+    ]
+  },
+  {
+    "title": "Chocolate Brownies",
+    "time": 45,
+    "isPublic": true,
+    "ingredients": ["200 g dark chocolate", "175 g butter", "3 eggs", "250 g caster sugar", "100 g plain flour", "30 g cocoa", "½ tsp salt"],
+    "instructions": [
+      "Heat the oven to 170°C fan and line a 20 cm tin.",
+      "Melt the chocolate and butter together, then cool slightly.",
+      "Whisk the eggs and sugar until pale and thick — this is what gives the papery top.",
+      "Fold in the chocolate, then the sifted flour, cocoa and salt.",
+      "Bake 25 minutes. The middle should still wobble.",
+      "Cool completely in the tin before cutting."
+    ]
+  },
+  {
+    "title": "Apple & Blackberry Crumble",
+    "time": 60,
+    "isPublic": true,
+    "ingredients": ["6 bramley apples", "200 g blackberries", "150 g plain flour", "100 g cold butter", "80 g demerara sugar", "50 g rolled oats", "1 tsp cinnamon"],
+    "instructions": [
+      "Peel and chop the apples, stew with a splash of water and half the sugar for 10 minutes.",
+      "Stir in the blackberries and tip into a baking dish.",
+      "Rub the butter into the flour until it looks like coarse breadcrumbs, then stir in the oats, remaining sugar and cinnamon.",
+      "Scatter over the fruit without pressing it down.",
+      "Bake at 180°C fan for 35 minutes until the top is deep gold."
+    ]
+  },
+  {
+    "title": "Weeknight Carbonara",
+    "time": 20,
+    "isPublic": true,
+    "ingredients": ["400 g spaghetti", "150 g guanciale or pancetta", "3 egg yolks", "1 whole egg", "80 g pecorino", "Black pepper"],
+    "instructions": [
+      "Boil the pasta in well-salted water.",
+      "Render the guanciale slowly in a cold pan until crisp.",
+      "Beat the yolks, egg and cheese with a great deal of black pepper.",
+      "Drain the pasta, keeping a mugful of water, and toss it into the pork off the heat.",
+      "Add the egg mixture and loosen with pasta water, stirring hard. The pan must not be hot enough to scramble it."
+    ]
+  },
+  {
+    "title": "Green Thai Curry",
+    "time": 40,
+    "isPublic": true,
+    "ingredients": ["3 tbsp green curry paste", "400 ml coconut milk", "500 g chicken thigh", "1 aubergine", "Thai basil", "2 tbsp fish sauce", "1 tsp palm sugar", "Lime"],
+    "instructions": [
+      "Fry the paste in the thick cream from the top of the coconut milk until it splits and smells sweet.",
+      "Add the chicken and colour it in the paste.",
+      "Pour in the rest of the coconut milk with the chopped aubergine and simmer 20 minutes.",
+      "Season with fish sauce, palm sugar and lime until it tastes balanced.",
+      "Stir through the basil off the heat."
+    ]
+  },
+  {
+    "title": "Sourdough Focaccia",
+    "time": 1440,
+    "isPublic": true,
+    "ingredients": ["500 g strong white flour", "100 g active starter", "400 g water", "12 g salt", "Good olive oil", "Rosemary", "Flaky salt"],
+    "instructions": [
+      "Mix the flour and water and rest for an hour.",
+      "Add the starter and salt, then do four sets of stretch and folds over two hours.",
+      "Refrigerate overnight — up to 18 hours.",
+      "Tip into a well-oiled tray, dimple all over with your fingers and prove until puffy.",
+      "Scatter with rosemary and flaky salt and bake at 230°C for 22 minutes."
+    ]
+  },
+  {
+    "title": "Shakshuka",
+    "time": 30,
+    "isPublic": true,
+    "ingredients": ["2 tins chopped tomatoes", "1 onion", "2 peppers", "4 cloves garlic", "1 tsp cumin", "1 tsp smoked paprika", "4 eggs", "Feta and parsley"],
+    "instructions": [
+      "Soften the sliced onion and peppers in oil for 10 minutes.",
+      "Add the garlic and spices and cook for one minute.",
+      "Pour in the tomatoes and simmer until thick, about 15 minutes.",
+      "Make four wells, crack in the eggs, cover and cook until the whites set.",
+      "Crumble over feta and parsley."
+    ]
+  },
+  {
+    "title": "Roasted Tomato Soup",
+    "time": 55,
+    "isPublic": true,
+    "ingredients": ["1.5 kg ripe tomatoes", "1 bulb garlic", "2 onions", "Handful of basil", "3 tbsp olive oil", "500 ml stock"],
+    "instructions": [
+      "Halve the tomatoes and roast with the quartered onions, garlic cloves and oil at 200°C for 40 minutes.",
+      "Tip everything into a pan with the stock and simmer for 10 minutes.",
+      "Blend until smooth, adding basil at the end.",
+      "Season hard — roasted tomatoes take more salt than you expect."
+    ]
+  },
+  {
+    "title": "Beef Chilli",
+    "time": 120,
+    "isPublic": true,
+    "ingredients": ["800 g beef mince", "2 tins kidney beans", "2 tins chopped tomatoes", "2 onions", "3 tbsp chipotle paste", "1 tbsp cumin", "1 square dark chocolate"],
+    "instructions": [
+      "Brown the mince in batches so it fries rather than steams.",
+      "Soften the onions, add the spices and chipotle, and return the beef.",
+      "Add the tomatoes and simmer, uncovered, for an hour.",
+      "Stir in the drained beans and the chocolate and cook 20 minutes more.",
+      "Rest off the heat for 10 minutes before serving."
+    ]
+  },
+  {
+    "title": "Mushroom Risotto",
+    "time": 40,
+    "isPublic": true,
+    "ingredients": ["300 g arborio rice", "400 g mixed mushrooms", "1 litre hot stock", "1 onion", "150 ml white wine", "60 g parmesan", "50 g butter"],
+    "instructions": [
+      "Fry the mushrooms hard in a dry pan, then in butter. Set aside.",
+      "Soften the finely chopped onion, add the rice and toast for two minutes.",
+      "Pour in the wine and let it disappear.",
+      "Add stock a ladle at a time, stirring, for about 18 minutes.",
+      "Beat in the butter, parmesan and mushrooms off the heat and rest two minutes."
+    ]
+  },
+  {
+    "title": "Fish Tacos with Lime Slaw",
+    "time": 25,
+    "isPublic": true,
+    "ingredients": ["500 g white fish", "2 tsp chipotle powder", "¼ red cabbage", "2 limes", "4 tbsp soured cream", "8 corn tortillas", "Coriander"],
+    "instructions": [
+      "Toss the fish in chipotle, salt and oil and fry two minutes a side.",
+      "Shred the cabbage and dress with lime juice and salt.",
+      "Warm the tortillas directly over a flame.",
+      "Build with fish, slaw, soured cream and coriander."
+    ]
+  },
+  {
+    "title": "Banana Bread",
+    "time": 75,
+    "isPublic": true,
+    "ingredients": ["3 very ripe bananas", "150 g butter", "150 g brown sugar", "2 eggs", "225 g self-raising flour", "1 tsp bicarbonate of soda", "50 g walnuts"],
+    "instructions": [
+      "Heat the oven to 160°C fan and line a loaf tin.",
+      "Cream the butter and sugar, then beat in the eggs one at a time.",
+      "Mash the bananas and fold them through.",
+      "Fold in the flour, bicarb and walnuts.",
+      "Bake for 55 minutes until a skewer comes out clean."
+    ]
+  },
+  {
+    "title": "Chickpea & Spinach Curry",
+    "time": 30,
+    "isPublic": true,
+    "ingredients": ["2 tins chickpeas", "200 g spinach", "1 tin coconut milk", "2 tbsp curry powder", "1 onion", "3 cloves garlic", "Thumb of ginger"],
+    "instructions": [
+      "Fry the onion, garlic and ginger until soft and golden.",
+      "Add the curry powder and cook until fragrant.",
+      "Tip in the chickpeas and coconut milk and simmer 15 minutes.",
+      "Wilt the spinach through at the end and season with salt and lemon."
+    ]
+  },
+  {
+    "title": "Sticky Toffee Pudding",
+    "time": 70,
+    "isPublic": false,
+    "ingredients": ["200 g dates", "250 ml boiling water", "1 tsp bicarbonate of soda", "175 g flour", "80 g butter", "150 g dark brown sugar", "2 eggs", "300 ml double cream"],
+    "instructions": [
+      "Soak the chopped dates in the boiling water with the bicarb for 10 minutes.",
+      "Cream the butter and half the sugar, beat in the eggs, then fold in the flour and dates with their liquid.",
+      "Bake at 170°C fan for 35 minutes.",
+      "Simmer the cream with the remaining sugar to make the toffee sauce.",
+      "Prick the sponge all over and pour half the sauce on while hot."
+    ]
+  },
+  {
+    "title": "Pulled Pork Shoulder",
+    "time": 480,
+    "isPublic": true,
+    "ingredients": ["2.5 kg pork shoulder", "3 tbsp smoked paprika", "2 tbsp brown sugar", "1 tbsp mustard powder", "1 tbsp salt", "250 ml cider vinegar"],
+    "instructions": [
+      "Rub the pork all over with the mixed spices, sugar and salt. Leave overnight if you can.",
+      "Roast at 220°C for 30 minutes, then drop to 130°C.",
+      "Add the vinegar to the tray, cover tightly with foil and cook for seven hours.",
+      "Rest for 30 minutes, then pull apart with two forks.",
+      "Toss the meat through the skimmed pan juices."
+    ]
+  },
+  {
+    "title": "Caesar Salad",
+    "time": 15,
+    "isPublic": true,
+    "ingredients": ["2 romaine lettuces", "4 anchovy fillets", "1 egg yolk", "1 clove garlic", "50 g parmesan", "1 tsp dijon", "Juice of ½ lemon", "Sourdough croutons"],
+    "instructions": [
+      "Mash the anchovies and garlic to a paste.",
+      "Whisk in the yolk, mustard and lemon, then trickle in oil until thick.",
+      "Stir through most of the grated parmesan.",
+      "Toss with torn lettuce and croutons and finish with the rest of the cheese."
+    ]
+  },
+  {
+    "title": "Pad Thai",
+    "time": 30,
+    "isPublic": true,
+    "ingredients": ["200 g flat rice noodles", "200 g prawns", "2 eggs", "3 tbsp tamarind paste", "2 tbsp fish sauce", "2 tbsp palm sugar", "Beansprouts", "Peanuts and lime"],
+    "instructions": [
+      "Soak the noodles in warm water until pliable but not soft.",
+      "Mix the tamarind, fish sauce and sugar into a sauce.",
+      "Fry the prawns hard, push aside, scramble the eggs in the same pan.",
+      "Add the drained noodles and sauce and toss over high heat for two minutes.",
+      "Throw in beansprouts at the last moment and serve with peanuts and lime."
+    ]
+  },
+  {
+    "title": "Lamb Tagine",
+    "time": 150,
+    "isPublic": true,
+    "ingredients": ["1 kg lamb shoulder", "2 onions", "1 tsp each cumin, coriander, cinnamon", "200 g dried apricots", "400 g chopped tomatoes", "500 ml stock", "Coriander and almonds"],
+    "instructions": [
+      "Brown the diced lamb in batches.",
+      "Soften the onions, add the spices and cook until fragrant.",
+      "Return the lamb with the tomatoes and stock, cover and simmer for 90 minutes.",
+      "Add the apricots for the last 30 minutes.",
+      "Scatter with toasted almonds and coriander."
+    ]
+  },
+  {
+    "title": "Buttermilk Pancakes",
+    "time": 20,
+    "isPublic": true,
+    "ingredients": ["200 g plain flour", "2 tsp baking powder", "1 tbsp sugar", "300 ml buttermilk", "2 eggs", "40 g melted butter", "Pinch of salt"],
+    "instructions": [
+      "Whisk the dry ingredients in one bowl and the wet in another.",
+      "Combine with as few strokes as possible — lumps are correct.",
+      "Rest the batter 10 minutes.",
+      "Cook in a buttered pan over medium heat until bubbles set at the edges, then flip."
+    ]
+  },
+  {
+    "title": "Ramen Broth from Scratch",
+    "time": 720,
+    "isPublic": false,
+    "ingredients": ["2 kg pork bones", "1 chicken carcass", "1 onion", "Thumb of ginger", "6 spring onions", "1 head garlic", "2 sheets kombu"],
+    "instructions": [
+      "Blanch the bones for 10 minutes, then rinse away every trace of scum.",
+      "Cover with fresh water and boil hard for 10 hours, topping up as it reduces.",
+      "Add the aromatics for the final two hours.",
+      "Strain through a fine sieve. It should be opaque and cling to a spoon.",
+      "Season with tare, not salt, when you build the bowl."
+    ]
+  },
+  {
+    "title": "Halloumi & Watermelon Salad",
+    "time": 10,
+    "isPublic": true,
+    "ingredients": ["250 g halloumi", "½ small watermelon", "Handful of mint", "1 lime", "2 tbsp olive oil", "Black pepper"],
+    "instructions": [
+      "Slice the halloumi and fry until deeply golden on both sides.",
+      "Cube the watermelon and scatter on a platter.",
+      "Lay the hot cheese over the cold melon.",
+      "Dress with lime, oil, torn mint and pepper. No salt — the cheese has plenty."
+    ]
+  },
+  {
+    "title": "Beef Wellington",
+    "time": 180,
+    "isPublic": false,
+    "ingredients": ["1 kg beef fillet", "400 g chestnut mushrooms", "12 slices prosciutto", "500 g puff pastry", "2 tbsp english mustard", "2 egg yolks", "Thyme"],
+    "instructions": [
+      "Sear the seasoned fillet on all sides and brush with mustard while hot. Cool completely.",
+      "Blitz the mushrooms and fry until every drop of water has gone — this takes longer than you think.",
+      "Lay out the prosciutto on cling film, spread with the duxelles, and roll the beef up tightly. Chill 30 minutes.",
+      "Wrap in pastry, seal, glaze with yolk and score.",
+      "Bake at 200°C for 35 minutes for medium rare, then rest 15 minutes."
+    ]
+  },
+  {
+    "title": "Garlic Butter Prawns",
+    "time": 12,
+    "isPublic": true,
+    "ingredients": ["400 g raw king prawns", "80 g butter", "5 cloves garlic", "1 red chilli", "Parsley", "½ lemon", "Crusty bread"],
+    "instructions": [
+      "Melt the butter with the sliced garlic and chilli over gentle heat until it just turns golden.",
+      "Raise the heat and add the prawns in one layer.",
+      "Turn them after 90 seconds — they are done the moment they curl.",
+      "Off the heat, add lemon and parsley and serve with bread for the butter."
+    ]
+  }
+]

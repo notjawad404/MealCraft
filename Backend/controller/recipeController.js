@@ -1,23 +1,122 @@
+const mongoose = require('mongoose');
 const Recipes = require('../model/recipeModel');
-const { inspectImageDataUrl } = require('../utils/imageData');
+const { inspectImageDataUrl, MAX_THUMBNAIL_BYTES } = require('../utils/imageData');
 
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
 
-// Get all recipes
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 50;
+const MAX_MINUTES = 2880; // two days, which covers proving, curing and brining
+
+// `time` is a string on the schema, so it is converted for sorting. Anything
+// that will not convert is parked at the end of the ascending order rather than
+// the front, which is what someone scanning for "quickest" actually wants.
+const UNSORTABLE_TIME = 10 ** 7;
+
+const SORTS = {
+    newest: { createdAt: -1, _id: -1 },
+    oldest: { createdAt: 1, _id: 1 },
+    title: { titleSort: 1, _id: 1 },
+    quickest: { timeSort: 1, _id: 1 },
+    longest: { timeSort: -1, _id: -1 },
+};
+
+const DEFAULT_SORT = 'newest';
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Positive whole minutes, or null if the value is not usable. */
+const parseMinutes = (value) => {
+    if (!/^\d+$/.test(value)) return null;
+    const minutes = Number(value);
+    return minutes >= 1 && minutes <= MAX_MINUTES ? minutes : null;
+};
+
+/** Query-string params are user input; every one of them is clamped here. */
+const parseListQuery = (query) => {
+    const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
+    const limit = Math.min(MAX_LIMIT, Math.max(1, Number.parseInt(query.limit, 10) || DEFAULT_LIMIT));
+    const sort = Object.hasOwn(SORTS, query.sort) ? query.sort : DEFAULT_SORT;
+    const search = text(query.search).slice(0, 100);
+    return { page, limit, sort, search };
+};
+
+/**
+ * Shared paging/searching/sorting for the two listing endpoints. `baseMatch`
+ * decides *which* recipes are in scope — public ones, or one user's own.
+ */
+async function listRecipes(baseMatch, query) {
+    const { page, limit, sort, search } = parseListQuery(query);
+
+    const match = { ...baseMatch };
+    if (search) {
+        const pattern = new RegExp(escapeRegex(search), 'i');
+        match.$or = [{ title: pattern }, { ingredients: pattern }];
+    }
+
+    const [facet] = await Recipes.aggregate([
+        { $match: match },
+        {
+            $addFields: {
+                titleSort: { $toLower: '$title' },
+                timeSort: {
+                    $convert: { input: '$time', to: 'int', onError: UNSORTABLE_TIME, onNull: UNSORTABLE_TIME },
+                },
+                // Recipes saved before thumbnails existed only have the full
+                // image; falling back keeps their cards from going blank.
+                thumbnail: { $ifNull: ['$thumbnail', '$image'] },
+            },
+        },
+        // Dropped before the sort, so the base64 payload is never carried
+        // through it. Everything past this point is small.
+        { $project: { image: 0, instructions: 0 } },
+        { $sort: SORTS[sort] },
+        {
+            $facet: {
+                results: [
+                    { $skip: (page - 1) * limit },
+                    { $limit: limit },
+                    { $project: { titleSort: 0, timeSort: 0, __v: 0 } },
+                ],
+                total: [{ $count: 'value' }],
+            },
+        },
+    ]);
+
+    const total = facet?.total?.[0]?.value ?? 0;
+
+    return {
+        recipes: facet?.results ?? [],
+        page,
+        limit,
+        sort,
+        search,
+        total,
+        pages: Math.max(1, Math.ceil(total / limit)),
+    };
+}
+
+// Get public recipes — paged, searchable, sortable
 const getRecipes = async (req, res, next) => {
     try {
-        const recipes = await Recipes.find({ isPublic: true }).populate('createdBy', 'name');
-        return res.json(recipes);
+        return res.json(await listRecipes({ isPublic: true }, req.query));
     } catch (err) {
         next(err);
     }
 };
 
-// Get all recipes belonging to the logged-in user (public + private)
+// Get recipes belonging to the logged-in user (public + private)
 const getMyRecipes = async (req, res, next) => {
     try {
-        const recipes = await Recipes.find({ createdBy: req.user.userId });
-        return res.json(recipes);
+        // $match does no schema-aware casting the way find() does, so the id
+        // off the token has to be converted by hand — as a string it silently
+        // matches nothing at all.
+        if (!mongoose.isValidObjectId(req.user.userId)) {
+            return res.status(401).json({ message: 'Invalid or expired token' });
+        }
+        const createdBy = new mongoose.Types.ObjectId(req.user.userId);
+
+        return res.json(await listRecipes({ createdBy }, req.query));
     } catch (err) {
         next(err);
     }
@@ -36,10 +135,29 @@ const getRecipe = async (req, res, next) => {
     }
 };
 
+/**
+ * Checks the two base64 fields on a write. Returns an error message, or null
+ * when both are fine (or absent).
+ */
+const checkImages = ({ image, thumbnail }) => {
+    if (image) {
+        const check = inspectImageDataUrl(image);
+        if (!check.ok) return check.message;
+    }
+    if (thumbnail) {
+        const check = inspectImageDataUrl(thumbnail, {
+            maxBytes: MAX_THUMBNAIL_BYTES,
+            label: 'Thumbnail',
+        });
+        if (!check.ok) return check.message;
+    }
+    return null;
+};
+
 // Add a new recipe
 const addRecipe = async (req, res, next) => {
     try {
-        const { image, isPublic } = req.body;
+        const { image, thumbnail, isPublic } = req.body;
         const title = text(req.body.title);
         const ingredients = text(req.body.ingredients);
         const instructions = text(req.body.instructions);
@@ -50,13 +168,17 @@ const addRecipe = async (req, res, next) => {
             return res.status(400).json({ message: 'Required parameters missing' });
         }
 
-        // The image is a base64 data URI that gets stored on the document, so it
-        // is vetted before it can bloat the collection with something unusable.
-        if (image) {
-            const check = inspectImageDataUrl(image);
-            if (!check.ok) {
-                return res.status(400).json({ message: check.message });
-            }
+        // Kept to whole minutes so the "quickest" sort has something to work
+        // with — the listing converts this field to a number.
+        if (parseMinutes(time) === null) {
+            return res.status(400).json({ message: `Time must be whole minutes between 1 and ${MAX_MINUTES}.` });
+        }
+
+        // The images are base64 data URIs that get stored on the document, so
+        // they are vetted before they can bloat the collection.
+        const imageError = checkImages(req.body);
+        if (imageError) {
+            return res.status(400).json({ message: imageError });
         }
 
         const recipe = await Recipes.create({
@@ -65,6 +187,7 @@ const addRecipe = async (req, res, next) => {
             instructions,
             time,
             image: image || undefined,
+            thumbnail: thumbnail || undefined,
             username,
             createdBy: req.user.userId,
             isPublic: isPublic !== undefined ? Boolean(isPublic) : true,
@@ -88,16 +211,18 @@ const editRecipe = async (req, res, next) => {
             return res.status(403).json({ message: 'Not authorized to edit this recipe' });
         }
 
-        const { title, ingredients, instructions, time, image, isPublic } = req.body;
+        const { title, ingredients, instructions, time, image, thumbnail, isPublic } = req.body;
 
-        if (image) {
-            const check = inspectImageDataUrl(image);
-            if (!check.ok) {
-                return res.status(400).json({ message: check.message });
-            }
+        if (time !== undefined && parseMinutes(text(time)) === null) {
+            return res.status(400).json({ message: `Time must be whole minutes between 1 and ${MAX_MINUTES}.` });
         }
 
-        const patch = { title, ingredients, instructions, time, image };
+        const imageError = checkImages(req.body);
+        if (imageError) {
+            return res.status(400).json({ message: imageError });
+        }
+
+        const patch = { title, ingredients, instructions, time, image, thumbnail };
         if (isPublic !== undefined) patch.isPublic = Boolean(isPublic);
         const updated = await Recipes.findByIdAndUpdate(req.params.id, patch, { new: true });
 

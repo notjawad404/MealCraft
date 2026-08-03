@@ -18,6 +18,12 @@ const MAX_ENCODED_BYTES = 2 * 1024 * 1024;
 const EDGE_STEPS = [1280, 960, 720];
 const QUALITY_STEPS = [0.85, 0.72, 0.6, 0.5];
 
+// Listings send the thumbnail rather than the full image, so twenty of these
+// have to be cheap. At 400px a card never has to upscale.
+const THUMBNAIL_EDGE = 400;
+const THUMBNAIL_QUALITY_STEPS = [0.7, 0.6, 0.5, 0.4];
+const MAX_THUMBNAIL_BYTES = 192 * 1024; // matches the backend
+
 export class ImageError extends Error {
   constructor(message) {
     super(message);
@@ -70,9 +76,21 @@ function drawScaled(img, maxEdge) {
   return canvas;
 }
 
+/** The small copy that listings show. An animated GIF becomes its first frame. */
+function makeThumbnail(img) {
+  const canvas = drawScaled(img, THUMBNAIL_EDGE);
+  for (const quality of THUMBNAIL_QUALITY_STEPS) {
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    if (encodedBytes(dataUrl) <= MAX_THUMBNAIL_BYTES) return dataUrl;
+  }
+  // 400px of anything at quality 0.4 fits comfortably; if it somehow does not,
+  // the listing falls back to a placeholder rather than failing the save.
+  return '';
+}
+
 /**
  * @param {File} file
- * @returns {Promise<{ dataUrl: string, bytes: number, width: number, height: number }>}
+ * @returns {Promise<{ dataUrl: string, thumbnail: string, bytes: number, width: number, height: number }>}
  * @throws {ImageError} with a message meant to be shown to the user as-is
  */
 export async function fileToDataUrl(file) {
@@ -93,7 +111,13 @@ export async function fileToDataUrl(file) {
     const bytes = encodedBytes(original);
     if (bytes <= MAX_ENCODED_BYTES) {
       const img = await loadImage(original);
-      return { dataUrl: original, bytes, width: img.naturalWidth, height: img.naturalHeight };
+      return {
+        dataUrl: original,
+        thumbnail: makeThumbnail(img),
+        bytes,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      };
     }
     throw new ImageError(
       `That GIF is ${formatBytes(bytes)}. GIFs cannot be compressed here — use one under ${formatBytes(MAX_ENCODED_BYTES)}.`,
@@ -110,7 +134,13 @@ export async function fileToDataUrl(file) {
       const dataUrl = canvas.toDataURL('image/jpeg', quality);
       const bytes = encodedBytes(dataUrl);
       if (bytes <= MAX_ENCODED_BYTES) {
-        return { dataUrl, bytes, width: canvas.width, height: canvas.height };
+        return {
+          dataUrl,
+          thumbnail: makeThumbnail(img),
+          bytes,
+          width: canvas.width,
+          height: canvas.height,
+        };
       }
     }
   }

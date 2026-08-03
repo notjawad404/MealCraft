@@ -2,9 +2,12 @@ import { useId, useRef, useState } from 'react';
 import { ACCEPTED_TYPES, ImageError, fileToDataUrl, formatBytes } from '../../lib/image';
 
 /**
- * Picks an image and hands back a base64 data URI, ready to be stored on the
- * recipe document. Encoding happens here rather than at submit time so the size
- * of what will actually be sent is visible before anyone commits to it.
+ * Picks an image and hands back two base64 data URIs — the full picture and the
+ * small copy listings use — ready to be stored on the recipe document. Encoding
+ * happens here rather than at submit time so the size of what will actually be
+ * sent is visible before anyone commits to it.
+ *
+ * `onChange` receives `{ image, thumbnail }`, both empty strings when cleared.
  */
 export default function ImageUpload({ value, onChange, disabled }) {
   const inputId = useId();
@@ -21,10 +24,10 @@ export default function ImageUpload({ value, onChange, disabled }) {
     setEncoding(true);
     try {
       const result = await fileToDataUrl(file);
-      onChange(result.dataUrl);
+      onChange({ image: result.dataUrl, thumbnail: result.thumbnail });
       setMeta({ bytes: result.bytes, width: result.width, height: result.height });
     } catch (err) {
-      onChange('');
+      onChange({ image: '', thumbnail: '' });
       setMeta(null);
       setError(err instanceof ImageError ? err.message : 'That image could not be processed.');
     } finally {
@@ -35,7 +38,7 @@ export default function ImageUpload({ value, onChange, disabled }) {
   };
 
   const clear = () => {
-    onChange('');
+    onChange({ image: '', thumbnail: '' });
     setMeta(null);
     setError('');
   };

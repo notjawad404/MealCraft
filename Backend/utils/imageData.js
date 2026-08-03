@@ -6,6 +6,11 @@
 // before it ever gets here, so this is a backstop, not the primary limit.
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
+// Listings return the thumbnail instead of the full image — twenty full-size
+// photos a page is not something anyone wants to download. Keeping the ceiling
+// this low is what makes that trade worthwhile.
+const MAX_THUMBNAIL_BYTES = 192 * 1024;
+
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 const BASE64_ONLY = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -22,31 +27,37 @@ const SIGNATURES = {
         b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP',
 };
 
-const formatMb = (bytes) => `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
+// Thumbnails are capped well under a megabyte, so rounding everything to MB
+// produces messages like "too large (0.2 MB), the limit is 0.2 MB".
+const formatSize = (bytes) =>
+    bytes < 1024 * 1024
+        ? `${Math.round(bytes / 1024)} KB`
+        : `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
 
 const reject = (message) => ({ ok: false, message });
 
 /**
- * Validate a base64 image data URI destined for the `image` field.
+ * Validate a base64 image data URI destined for the `image` or `thumbnail` field.
  *
  * @param {unknown} value
+ * @param {{ maxBytes?: number, label?: string }} [options]
  * @returns {{ ok: true, bytes: number, mime: string } | { ok: false, message: string }}
  */
-function inspectImageDataUrl(value) {
+function inspectImageDataUrl(value, { maxBytes = MAX_IMAGE_BYTES, label = 'Image' } = {}) {
     if (typeof value !== 'string') {
-        return reject('Image must be a base64 data URI.');
+        return reject(`${label} must be a base64 data URI.`);
     }
 
     // Parsed by hand rather than with one big regex: the payload runs to
     // megabytes, and there is no reason to hand that to the regex engine.
     const comma = value.indexOf(',');
     if (!value.startsWith('data:') || comma === -1) {
-        return reject('Image must be a base64 data URI (data:image/…;base64,…).');
+        return reject(`${label} must be a base64 data URI (data:image/…;base64,…).`);
     }
 
     const header = value.slice('data:'.length, comma);
     if (!header.endsWith(';base64')) {
-        return reject('Image must be base64-encoded.');
+        return reject(`${label} must be base64-encoded.`);
     }
 
     const mime = header.slice(0, -';base64'.length).toLowerCase();
@@ -56,14 +67,14 @@ function inspectImageDataUrl(value) {
 
     const payload = value.slice(comma + 1);
     if (!payload || !BASE64_ONLY.test(payload)) {
-        return reject('Image data is not valid base64.');
+        return reject(`${label} data is not valid base64.`);
     }
 
     // Checked before decoding so a hostile payload is never materialised in
     // memory just to be rejected. base64 carries 3 bytes per 4 characters.
     const bytes = Math.floor((payload.length * 3) / 4) - (payload.endsWith('==') ? 2 : payload.endsWith('=') ? 1 : 0);
-    if (bytes > MAX_IMAGE_BYTES) {
-        return reject(`Image is too large (${formatMb(bytes)}). The limit is ${formatMb(MAX_IMAGE_BYTES)}.`);
+    if (bytes > maxBytes) {
+        return reject(`${label} is too large (${formatSize(bytes)}). The limit is ${formatSize(maxBytes)}.`);
     }
 
     const buffer = Buffer.from(payload, 'base64');
@@ -74,4 +85,4 @@ function inspectImageDataUrl(value) {
     return { ok: true, bytes: buffer.length, mime };
 }
 
-module.exports = { inspectImageDataUrl, MAX_IMAGE_BYTES, ALLOWED_TYPES };
+module.exports = { inspectImageDataUrl, MAX_IMAGE_BYTES, MAX_THUMBNAIL_BYTES, ALLOWED_TYPES };

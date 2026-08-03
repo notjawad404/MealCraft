@@ -4,10 +4,13 @@ import Brand from './Brand';
 import ThemeToggle from './ThemeToggle';
 import useAuth from '../../hooks/useAuth';
 
-const links = [
+// "Add Recipe" is not here — the "Share a recipe" button below already covers it.
+const publicLinks = [
   { to: '/', label: 'Home' },
-  { to: '/add', label: 'Add Recipe' },
+  { to: '/recipes', label: 'Recipes' },
 ];
+
+const memberLinks = [{ to: '/my-recipes', label: 'My recipes' }];
 
 const linkClasses = ({ isActive }) =>
   `relative rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200
@@ -32,6 +35,8 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const links = isAuthenticated ? [...publicLinks, ...memberLinks] : publicLinks;
 
   const close = () => setOpen(false);
 

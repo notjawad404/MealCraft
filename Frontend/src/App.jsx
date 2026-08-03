@@ -5,6 +5,8 @@ import Layout from './components/common/Layout';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import GuestRoute from './components/common/GuestRoute';
 import Home from './components/Home';
+import Recipes from './components/Recipes';
+import MyRecipes from './components/MyRecipes';
 import AddRecipe from './components/AddRecipe';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
@@ -16,6 +18,7 @@ export default function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />
+            <Route path="/recipes" element={<Recipes />} />
 
             {/* Signed-in users get bounced back out of these. */}
             <Route element={<GuestRoute />}>
@@ -26,6 +29,7 @@ export default function App() {
             {/* Guests are sent to /login and returned here afterwards. */}
             <Route element={<ProtectedRoute />}>
               <Route path="/add" element={<AddRecipe />} />
+              <Route path="/my-recipes" element={<MyRecipes />} />
             </Route>
           </Route>
         </Routes>

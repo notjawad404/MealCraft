@@ -13,6 +13,7 @@ const emptyRecipe = {
   instructions: '',
   time: '',
   image: '',
+  thumbnail: '',
   isPublic: true,
 };
 
@@ -107,6 +108,7 @@ export default function RecipeForm({
         instructions: values.instructions.trim(),
         time: String(Number(values.time)),
         image: values.image || undefined,
+        thumbnail: values.thumbnail || undefined,
         isPublic: values.isPublic,
       });
     } catch (err) {
@@ -191,7 +193,11 @@ export default function RecipeForm({
         />
       </Row>
 
-      <ImageUpload value={values.image} onChange={set('image')} disabled={pending} />
+      <ImageUpload
+        value={values.image}
+        onChange={({ image, thumbnail }) => setValues((prev) => ({ ...prev, image, thumbnail }))}
+        disabled={pending}
+      />
 
       <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-ink-200 bg-white px-4 py-4 dark:border-night-600 dark:bg-night-800">
         <input
