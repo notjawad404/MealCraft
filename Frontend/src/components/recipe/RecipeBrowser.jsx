@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import useDebouncedValue from '../../hooks/useDebouncedValue';
 import { DEFAULT_SORT, PAGE_SIZE, isSort, normalizePage } from '../../lib/recipes';
@@ -8,6 +8,9 @@ import RecipeCard from './RecipeCard';
 import RecipeToolbar from './RecipeToolbar';
 
 const GRID = 'grid gap-6 sm:grid-cols-2 lg:grid-cols-3';
+
+// Clears the sticky navbar (72px) so the first row is not tucked underneath it.
+const STICKY_NAV_OFFSET = 88;
 
 function Skeletons() {
   return (
@@ -72,6 +75,9 @@ export default function RecipeBrowser({
   const [searchInput, setSearchInput] = useState(search);
   const debouncedSearch = useDebouncedValue(searchInput.trim(), 350);
 
+  const resultsRef = useRef(null);
+  const scrollOnNextResults = useRef(false);
+
   // `data` deliberately survives across fetches. Blanking it and dropping back
   // to skeletons on every keystroke, sort or page turn is what made the grid
   // flicker; instead the previous results stay put and dim until the new ones
@@ -131,9 +137,26 @@ export default function RecipeBrowser({
   }, [data]);
 
   const goToPage = (next) => {
+    // The scroll itself is deferred until the new page has rendered. Scrolling
+    // straight away works against a document that is still 20 cards tall; when
+    // it shrinks to 2 the browser clamps the scroll back up, which is the exact
+    // jump this is meant to remove.
+    scrollOnNextResults.current = true;
     patchParams({ page: next > 1 ? next : null });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  useEffect(() => {
+    if (!data || !scrollOnNextResults.current) return;
+    scrollOnNextResults.current = false;
+
+    const element = resultsRef.current;
+    if (!element) return;
+
+    // Everything above the grid is fixed height, so this lands in the same
+    // place whether the page holds twenty cards or two.
+    const top = element.getBoundingClientRect().top + window.scrollY - STICKY_NAV_OFFSET;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  }, [data]);
 
   const { error, pending } = state;
   const total = data?.total ?? 0;
@@ -201,9 +224,14 @@ export default function RecipeBrowser({
 
       {data && (
         <div
+          ref={resultsRef}
           // Dimmed rather than unmounted while the next page is in flight, and
           // inert so a second click cannot land on results about to be replaced.
-          className={`transition-opacity duration-200 ease-out ${
+          //
+          // The min-height is a floor, not padding: a last page holding two
+          // cards would otherwise leave the document too short to scroll their
+          // row up to the top, and the footer would ride up under them.
+          className={`min-h-[55vh] transition-opacity duration-200 ease-out ${
             showPending ? 'pointer-events-none opacity-40' : 'opacity-100'
           }`}
         >
