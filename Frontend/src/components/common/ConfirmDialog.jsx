@@ -5,8 +5,8 @@ import FormAlert from './FormAlert';
  * A yes/no question over whatever the user was looking at, for the actions that
  * cannot be undone.
  *
- * Built on <dialog> like RecipeDialog, which brings the focus trap, the escape
- * key and the inert background with it. `onConfirm` is expected to do the work
+ * Built on <dialog>, which brings the focus trap, the escape key and the inert
+ * background with it. `onConfirm` is expected to do the work
  * and the caller keeps `pending` and `error` — the dialog stays open and shows
  * the message when something fails, rather than closing over a failure.
  */

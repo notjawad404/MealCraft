@@ -252,10 +252,27 @@ const getMyRecipes = async (req, res, next) => {
 // Get recipe by ID
 const getRecipe = async (req, res, next) => {
     try {
+        // A recipe has a page of its own now, so this id arrives from the
+        // address bar as often as from a card. Anything that is not an id at
+        // all is simply not found — findById would otherwise throw a CastError
+        // and answer 500 to what is really a typo.
+        if (!mongoose.isValidObjectId(req.params.id)) {
+            return res.status(404).json({ message: 'Recipe not found' });
+        }
+
         const recipe = await Recipes.findById(req.params.id).populate('createdBy', 'name');
         if (!recipe) {
             return res.status(404).json({ message: 'Recipe not found' });
         }
+
+        // And a private one has a URL that can be guessed or passed on. Anyone
+        // but its author is told it is not there, rather than that it is there
+        // and they may not look — which would confirm it exists.
+        const ownerId = (recipe.createdBy?._id ?? recipe.createdBy)?.toString();
+        if (!recipe.isPublic && (!req.user || req.user.userId !== ownerId)) {
+            return res.status(404).json({ message: 'Recipe not found' });
+        }
+
         return res.json(recipe);
     } catch (err) {
         next(err);

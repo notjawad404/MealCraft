@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   allergenLabel,
   describeOrigin,
@@ -9,7 +9,6 @@ import {
   splitIngredients,
 } from '../../lib/recipes';
 import ConfirmDialog from '../common/ConfirmDialog';
-import RecipeDialog from './RecipeDialog';
 
 const TAG_LIMIT = 4;
 const BADGE_LIMIT = 3;
@@ -42,7 +41,7 @@ function Placeholder() {
  * listing is the caller's business.
  */
 export default function RecipeCard({ recipe, showVisibility = false, manage = null }) {
-  const [open, setOpen] = useState(false);
+  const location = useLocation();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(''); // '' | 'visibility' | 'delete'
   const [actionError, setActionError] = useState('');
@@ -175,16 +174,20 @@ export default function RecipeCard({ recipe, showVisibility = false, manage = nu
 
           <h3 className="font-display text-lg font-semibold leading-snug text-ink-900 dark:text-paper-50">
             {/* Stretched over the whole card, so the click target is the card
-                while the accessibility tree still holds one plain control. The
-                ring is drawn by the article's focus-within, since the button
-                itself is only as big as its text. */}
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
+                while the accessibility tree still holds one plain link. The
+                ring is drawn by the article's focus-within, since the link
+                itself is only as big as its text.
+
+                Where the card is sitting travels with it, so the page can send
+                the reader back to this listing with its search and filters
+                still on. */}
+            <Link
+              to={`/recipes/${recipe._id}`}
+              state={{ from: `${location.pathname}${location.search}` }}
               className="text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
             >
               {recipe.title}
-            </button>
+            </Link>
           </h3>
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500 dark:text-ink-400">
@@ -299,10 +302,8 @@ export default function RecipeCard({ recipe, showVisibility = false, manage = nu
         </div>
       </article>
 
-      {/* Mounted only while open, so twenty cards do not mean twenty dialogs —
-          and so closing one stops whatever its video was playing. */}
-      {open && <RecipeDialog recipe={recipe} open={open} onClose={() => setOpen(false)} />}
-
+      {/* Mounted only while it is being asked, so twenty cards do not mean
+          twenty dialogs sitting in the document. */}
       {confirming && (
         <ConfirmDialog
           open={confirming}

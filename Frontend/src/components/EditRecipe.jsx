@@ -57,8 +57,9 @@ export default function EditRecipe() {
     const controller = new AbortController();
 
     setState({ recipe: null, error: '', pending: true });
+    // The token matters here: a private recipe is not found without it.
     recipeApi
-      .get(id, { signal: controller.signal })
+      .get(id, { token, signal: controller.signal })
       .then((recipe) => setState({ recipe, error: '', pending: false }))
       .catch((err) => {
         if (controller.signal.aborted) return;
@@ -66,7 +67,7 @@ export default function EditRecipe() {
       });
 
     return () => controller.abort();
-  }, [id]);
+  }, [id, token]);
 
   const { recipe, error, pending } = state;
 

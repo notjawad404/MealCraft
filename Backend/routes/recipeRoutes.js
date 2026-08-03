@@ -19,6 +19,7 @@ const {
     getSavedIds,
 } = require('../controller/interactionController.js');
 const authenticate = require('../middleware/authenticate.js');
+const optionalAuthenticate = require('../middleware/optionalAuthenticate.js');
 
 const router = express.Router();
 
@@ -34,7 +35,9 @@ router.get('/saved/ids', authenticate, getSavedIds);
 router.get('/saved/likes', authenticate, getLikedRecipes);
 router.get('/saved/favourites', authenticate, getFavouriteRecipes);
 
-router.get('/:id', getRecipe);
+// Open to everyone, but a private recipe is only found by its author — hence
+// the token being read here rather than required.
+router.get('/:id', optionalAuthenticate, getRecipe);
 router.post('/', authenticate, addRecipe);
 router.put('/:id', authenticate, editRecipe);
 router.delete('/:id', authenticate, deleteRecipe);

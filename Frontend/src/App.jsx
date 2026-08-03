@@ -6,6 +6,7 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 import GuestRoute from './components/common/GuestRoute';
 import Home from './components/Home';
 import Recipes from './components/Recipes';
+import RecipeDetail from './components/RecipeDetail';
 import MyRecipes from './components/MyRecipes';
 import AddRecipe from './components/AddRecipe';
 import EditRecipe from './components/EditRecipe';
@@ -20,6 +21,9 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />
             <Route path="/recipes" element={<Recipes />} />
+            {/* Open to everyone: the API is what keeps a private recipe out of
+                a stranger's hands, not the routing. */}
+            <Route path="/recipes/:id" element={<RecipeDetail />} />
 
             {/* Signed-in users get bounced back out of these. */}
             <Route element={<GuestRoute />}>

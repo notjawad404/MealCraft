@@ -102,8 +102,12 @@ export const recipeApi = {
    * One whole recipe. Listings leave out the method and the full-size image to
    * keep a page of twenty small, so anything showing a recipe in full has to
    * come back for it.
+   *
+   * The token is optional and worth sending whenever there is one: without it
+   * the API cannot tell the author of a private recipe from a stranger, and
+   * answers 404 to both.
    */
-  get: (id, { signal } = {}) => apiRequest(`/recipe/${id}`, { signal }),
+  get: (id, { token, signal } = {}) => apiRequest(`/recipe/${id}`, { token, signal }),
 
   /** The signed-in user's own recipes, public and private. */
   mine: (token, { signal, ...options } = {}) =>
