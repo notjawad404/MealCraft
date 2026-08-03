@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   allergenLabel,
   describeOrigin,
@@ -7,10 +8,18 @@ import {
   mealTypeLabel,
   splitIngredients,
 } from '../../lib/recipes';
+import ConfirmDialog from '../common/ConfirmDialog';
 import RecipeDialog from './RecipeDialog';
 
 const TAG_LIMIT = 4;
 const BADGE_LIMIT = 3;
+
+// The owner's controls. `relative z-10` on every one of them is load-bearing:
+// the title's stretched link covers the whole card, and anything meant to be
+// clicked in its own right has to sit above it.
+const CARD_ACTION =
+  'relative z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold' +
+  ' transition-colors disabled:pointer-events-none disabled:opacity-50';
 
 /** Stand-in for recipes saved without a photo — the app ships no image assets. */
 function Placeholder() {
@@ -24,8 +33,19 @@ function Placeholder() {
   );
 }
 
-export default function RecipeCard({ recipe, showVisibility = false }) {
+/**
+ * One recipe, as a card.
+ *
+ * `manage` turns on the owner's controls — edit, delete, and the visibility
+ * badge as a switch. It is `{ editPath, onDelete, onVisibilityChange }`; the
+ * last two do the work and may throw, and whatever they change about the
+ * listing is the caller's business.
+ */
+export default function RecipeCard({ recipe, showVisibility = false, manage = null }) {
   const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(''); // '' | 'visibility' | 'delete'
+  const [actionError, setActionError] = useState('');
 
   const allIngredients = splitIngredients(recipe.ingredients);
   const tags = allIngredients.slice(0, TAG_LIMIT);
@@ -40,6 +60,44 @@ export default function RecipeCard({ recipe, showVisibility = false }) {
   ];
   const shownBadges = badges.slice(0, BADGE_LIMIT);
   const allergens = recipe.allergens ?? [];
+
+  const canToggleVisibility = Boolean(manage?.onVisibilityChange);
+  const visibilityClass = `absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1
+                           text-[10px] font-semibold uppercase tracking-widest transition-colors ${
+                             recipe.isPublic
+                               ? 'bg-paper-50/95 text-ember-700'
+                               : 'bg-ink-900/85 text-paper-50'
+                           }`;
+
+  const toggleVisibility = async () => {
+    if (busy) return;
+    setBusy('visibility');
+    setActionError('');
+    try {
+      await manage.onVisibilityChange(!recipe.isPublic);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const handleDelete = async () => {
+    setBusy('delete');
+    setActionError('');
+    try {
+      await manage.onDelete();
+      // On success the refreshed listing takes this card with it, so there is
+      // nothing left here to put back in order.
+      setConfirming(false);
+    } catch (err) {
+      // The dialog stays open over a failure, so the reason sits next to the
+      // button that was pressed and a second try is one click away.
+      setActionError(err.message);
+    } finally {
+      setBusy('');
+    }
+  };
 
   return (
     <>
@@ -73,17 +131,39 @@ export default function RecipeCard({ recipe, showVisibility = false }) {
             </span>
           )}
 
-          {showVisibility && (
-            <span
-              className={`absolute right-3 top-3 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-widest ${
-                recipe.isPublic
-                  ? 'bg-paper-50/95 text-ember-700'
-                  : 'bg-ink-900/85 text-paper-50'
-              }`}
-            >
-              {recipe.isPublic ? 'Public' : 'Private'}
-            </span>
-          )}
+          {showVisibility &&
+            (canToggleVisibility ? (
+              // The badge is the switch — the thing it describes is the thing
+              // you press. `aria-pressed` says which way it is set; the label
+              // says what pressing it would do.
+              <button
+                type="button"
+                onClick={toggleVisibility}
+                disabled={Boolean(busy)}
+                aria-pressed={recipe.isPublic}
+                aria-label={recipe.isPublic ? 'Public — make it private' : 'Private — make it public'}
+                title={recipe.isPublic ? 'Make private' : 'Make public'}
+                className={`${visibilityClass} hover:shadow-card disabled:opacity-60 ${
+                  recipe.isPublic ? 'hover:bg-paper-50' : 'hover:bg-ink-900'
+                }`}
+              >
+                {busy === 'visibility' ? (
+                  <svg viewBox="0 0 24 24" className="h-3 w-3 animate-spin" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
+                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+                    <circle cx="12" cy="12" r="2.6" />
+                    {!recipe.isPublic && <path d="m4 20 16-16" />}
+                  </svg>
+                )}
+                {recipe.isPublic ? 'Public' : 'Private'}
+              </button>
+            ) : (
+              <span className={visibilityClass}>{recipe.isPublic ? 'Public' : 'Private'}</span>
+            ))}
         </div>
 
         <div className="flex flex-1 flex-col p-5">
@@ -178,12 +258,66 @@ export default function RecipeCard({ recipe, showVisibility = false }) {
               )}
             </div>
           )}
+
+          {manage && (
+            // `mt-auto` keeps this on the floor of the card, so the row lines
+            // up across a grid of cards that are not the same height.
+            <div className="mt-auto pt-4">
+              <div className="flex items-center gap-1 border-t border-ink-100 pt-3 dark:border-night-700">
+                <Link
+                  to={manage.editPath}
+                  className={`${CARD_ACTION} text-ink-700 hover:bg-paper-100 dark:text-ink-200 dark:hover:bg-night-700`}
+                >
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+                    <path d="m14.5 6.5 3 3" />
+                  </svg>
+                  Edit
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setConfirming(true)}
+                  disabled={Boolean(busy)}
+                  className={`${CARD_ACTION} text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40`}
+                >
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4.5 7h15M9.5 7V5.2A1.2 1.2 0 0 1 10.7 4h2.6a1.2 1.2 0 0 1 1.2 1.2V7" />
+                    <path d="M6.5 7.5 7.4 19a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4l.9-11.5" />
+                  </svg>
+                  Delete
+                </button>
+              </div>
+
+              {actionError && !confirming && (
+                <p role="alert" className="relative z-10 mt-2 text-xs leading-relaxed text-red-700 dark:text-red-300">
+                  {actionError}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </article>
 
       {/* Mounted only while open, so twenty cards do not mean twenty dialogs —
           and so closing one stops whatever its video was playing. */}
       {open && <RecipeDialog recipe={recipe} open={open} onClose={() => setOpen(false)} />}
+
+      {confirming && (
+        <ConfirmDialog
+          open={confirming}
+          title={`Delete “${recipe.title}”?`}
+          body="This cannot be undone. It also disappears from the saves and favourites of anyone who kept it."
+          confirmLabel="Delete recipe"
+          pending={busy === 'delete'}
+          error={actionError}
+          onConfirm={handleDelete}
+          onClose={() => {
+            setConfirming(false);
+            setActionError('');
+          }}
+        />
+      )}
     </>
   );
 }

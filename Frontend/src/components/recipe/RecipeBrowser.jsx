@@ -53,6 +53,12 @@ function Empty({ title, body, action }) {
  *
  * `fetchPage` must be stable — wrap it in useCallback — and takes
  * `{ search, sort, page, limit, signal }`.
+ *
+ * `manage` turns on the owner's controls on every card. It says what the
+ * actions *do* — `{ editPath(recipe), deleteRecipe(recipe),
+ * setVisibility(recipe, isPublic) }` — and this component owns what they mean
+ * for the list underneath: a flipped badge is patched in place, a deleted
+ * recipe costs a refetch so the count and the paging stay honest.
  */
 export default function RecipeBrowser({
   fetchPage,
@@ -62,6 +68,7 @@ export default function RecipeBrowser({
   emptyAction,
   searchPlaceholder,
   showVisibility = false,
+  manage = null,
 }) {
   const [params, setParams] = useSearchParams();
 
@@ -124,6 +131,10 @@ export default function RecipeBrowser({
   // flicker; instead the previous results stay put and dim until the new ones
   // land. Skeletons are then only ever seen once, on the very first load.
   const [state, setState] = useState({ data: null, error: '', pending: true });
+
+  // Bumped after a delete, to ask the current page for again — the total, the
+  // page count and what spills over from the next page all move with it.
+  const [reloadKey, setReloadKey] = useState(0);
 
   const patchParams = (changes, options) =>
     setParams((previous) => {
@@ -191,7 +202,39 @@ export default function RecipeBrowser({
     params.get('exclude'),
     params.get('maxCalories'),
     params.get('maxTime'),
+    reloadKey,
   ]);
+
+  /** One recipe changed underneath us — swap it in without disturbing the page. */
+  const patchRecipe = (id, changes) =>
+    setState((previous) =>
+      previous.data
+        ? {
+            ...previous,
+            data: {
+              ...previous.data,
+              recipes: previous.data.recipes.map((recipe) =>
+                recipe._id === id ? { ...recipe, ...changes } : recipe,
+              ),
+            },
+          }
+        : previous,
+    );
+
+  // Handed to each card. The errors are deliberately left to travel back up out
+  // of these promises: the card is what shows them, next to the recipe.
+  const manageRecipe = (recipe) =>
+    manage && {
+      editPath: manage.editPath(recipe),
+      onVisibilityChange: async (isPublic) => {
+        const updated = await manage.setVisibility(recipe, isPublic);
+        patchRecipe(recipe._id, { isPublic: updated?.isPublic ?? isPublic });
+      },
+      onDelete: async () => {
+        await manage.deleteRecipe(recipe);
+        setReloadKey((key) => key + 1);
+      },
+    };
 
   // Reachable by editing the URL, or by landing on a deep page whose recipes
   // have since been deleted.
@@ -323,7 +366,12 @@ export default function RecipeBrowser({
             <div className="space-y-8">
               <div className={GRID}>
                 {data.recipes.map((recipe) => (
-                  <RecipeCard key={recipe._id} recipe={recipe} showVisibility={showVisibility} />
+                  <RecipeCard
+                    key={recipe._id}
+                    recipe={recipe}
+                    showVisibility={showVisibility}
+                    manage={manageRecipe(recipe)}
+                  />
                 ))}
               </div>
 

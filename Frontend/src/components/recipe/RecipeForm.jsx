@@ -237,8 +237,10 @@ export default function RecipeForm({
         calories: wholeNumber(values.calories),
         nutrients: packNutrients(values.nutrients),
         videoUrl: values.videoUrl.trim(),
-        image: values.image || undefined,
-        thumbnail: values.thumbnail || undefined,
+        // Empty rather than omitted, for the same reason: on an edit, a removed
+        // photo has to reach the API as a cleared field, not as silence.
+        image: values.image,
+        thumbnail: values.thumbnail,
         isPublic: values.isPublic,
       });
     } catch (err) {

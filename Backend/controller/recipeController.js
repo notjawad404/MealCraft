@@ -402,6 +402,15 @@ const editRecipe = async (req, res, next) => {
 
         const { title, ingredients, instructions, time, image, thumbnail, isPublic } = req.body;
 
+        // An edit sends only what it means to change, so an absent field is
+        // left alone — but one that arrives blank would wipe a column the
+        // schema calls required, and findByIdAndUpdate runs no validators.
+        for (const key of ['title', 'ingredients', 'instructions', 'time']) {
+            if (req.body[key] !== undefined && !text(req.body[key])) {
+                return res.status(400).json({ message: 'Required parameters missing' });
+            }
+        }
+
         if (time !== undefined && parseMinutes(text(time)) === null) {
             return res.status(400).json({ message: `Time must be whole minutes between 1 and ${MAX_MINUTES}.` });
         }

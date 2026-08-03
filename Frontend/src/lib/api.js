@@ -84,6 +84,17 @@ function listQuery({ search, sort, page, limit, mealType, region, country, diet,
 export const recipeApi = {
   create: (payload, token) => apiRequest('/recipe', { method: 'POST', body: payload, token }),
 
+  /**
+   * Change a recipe you own. Only the keys sent are touched, so this backs both
+   * the edit form — which sends the lot — and the visibility toggle, which
+   * sends `{ isPublic }` on its own.
+   */
+  update: (id, payload, token) =>
+    apiRequest(`/recipe/${id}`, { method: 'PUT', body: payload, token }),
+
+  /** Delete a recipe you own, along with everyone's saves of it. */
+  remove: (id, token) => apiRequest(`/recipe/${id}`, { method: 'DELETE', token }),
+
   /** Public recipes. Returns `{ recipes, page, pages, total, limit }`. */
   list: ({ signal, ...options } = {}) => apiRequest(`/recipe${listQuery(options)}`, { signal }),
 

@@ -8,6 +8,7 @@ import Home from './components/Home';
 import Recipes from './components/Recipes';
 import MyRecipes from './components/MyRecipes';
 import AddRecipe from './components/AddRecipe';
+import EditRecipe from './components/EditRecipe';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 
@@ -30,6 +31,7 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/add" element={<AddRecipe />} />
               <Route path="/my-recipes" element={<MyRecipes />} />
+              <Route path="/recipes/:id/edit" element={<EditRecipe />} />
             </Route>
           </Route>
         </Routes>
