@@ -57,3 +57,7 @@ export const authApi = {
   register: (payload) => apiRequest('/auth/register', { method: 'POST', body: payload }),
   login: (payload) => apiRequest('/auth/login', { method: 'POST', body: payload }),
 };
+
+export const recipeApi = {
+  create: (payload, token) => apiRequest('/recipe', { method: 'POST', body: payload, token }),
+};

@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import AuthLayout from './AuthLayout';
 import Field from './Field';
-import FormAlert from './FormAlert';
-import SubmitButton from './SubmitButton';
+import FormAlert from '../common/FormAlert';
+import SubmitButton from '../common/SubmitButton';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

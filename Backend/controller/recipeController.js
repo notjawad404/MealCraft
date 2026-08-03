@@ -1,4 +1,7 @@
 const Recipes = require('../model/recipeModel');
+const { inspectImageDataUrl } = require('../utils/imageData');
+
+const text = (value) => (typeof value === 'string' ? value.trim() : '');
 
 // Get all recipes
 const getRecipes = async (req, res, next) => {
@@ -36,10 +39,24 @@ const getRecipe = async (req, res, next) => {
 // Add a new recipe
 const addRecipe = async (req, res, next) => {
     try {
-        const { title, ingredients, instructions, time, image, username, isPublic } = req.body;
+        const { image, isPublic } = req.body;
+        const title = text(req.body.title);
+        const ingredients = text(req.body.ingredients);
+        const instructions = text(req.body.instructions);
+        const time = text(req.body.time);
+        const username = text(req.body.username);
 
         if (!title || !ingredients || !instructions || !time || !username) {
             return res.status(400).json({ message: 'Required parameters missing' });
+        }
+
+        // The image is a base64 data URI that gets stored on the document, so it
+        // is vetted before it can bloat the collection with something unusable.
+        if (image) {
+            const check = inspectImageDataUrl(image);
+            if (!check.ok) {
+                return res.status(400).json({ message: check.message });
+            }
         }
 
         const recipe = await Recipes.create({
@@ -47,7 +64,7 @@ const addRecipe = async (req, res, next) => {
             ingredients,
             instructions,
             time,
-            image,
+            image: image || undefined,
             username,
             createdBy: req.user.userId,
             isPublic: isPublic !== undefined ? Boolean(isPublic) : true,
@@ -72,6 +89,14 @@ const editRecipe = async (req, res, next) => {
         }
 
         const { title, ingredients, instructions, time, image, isPublic } = req.body;
+
+        if (image) {
+            const check = inspectImageDataUrl(image);
+            if (!check.ok) {
+                return res.status(400).json({ message: check.message });
+            }
+        }
+
         const patch = { title, ingredients, instructions, time, image };
         if (isPublic !== undefined) patch.isPublic = Boolean(isPublic);
         const updated = await Recipes.findByIdAndUpdate(req.params.id, patch, { new: true });

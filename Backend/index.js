@@ -22,7 +22,11 @@ const app = express();
 app.use(cors({
     origin: process.env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim()) || ['http://localhost:5173']
 }));
-app.use(express.json());
+// Recipe images ride along in the JSON body as base64 data URIs, which sails
+// past body-parser's 100 kB default. The ceiling sits above the per-image limit
+// in utils/imageData.js to leave room for base64's ~4/3 expansion and the rest
+// of the recipe; anything over it is rejected by the error handler as a 413.
+app.use(express.json({ limit: '4mb' }));
 
 app.get('/', (req, res) => {
     res.send('API is running...');
