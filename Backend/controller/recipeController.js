@@ -43,13 +43,48 @@ const parseMinutes = (value) => {
     return minutes >= 1 && minutes <= MAX_MINUTES ? minutes : null;
 };
 
+const parseArrayParam = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) {
+        return val.flatMap((v) => (typeof v === 'string' ? v.split(',') : [])).map((s) => s.trim().toLowerCase()).filter(Boolean);
+    }
+    if (typeof val === 'string') {
+        return val.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+    }
+    return [];
+};
+
+const parseStringArrayParam = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) {
+        return val.flatMap((v) => (typeof v === 'string' ? v.split(',') : [])).map((s) => s.trim()).filter(Boolean);
+    }
+    if (typeof val === 'string') {
+        return val.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    return [];
+};
+
 /** Query-string params are user input; every one of them is clamped here. */
 const parseListQuery = (query) => {
     const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
     const limit = Math.min(MAX_LIMIT, Math.max(1, Number.parseInt(query.limit, 10) || DEFAULT_LIMIT));
     const sort = Object.hasOwn(SORTS, query.sort) ? query.sort : DEFAULT_SORT;
     const search = text(query.search).slice(0, 100);
-    return { page, limit, sort, search };
+
+    const mealTypes = parseArrayParam(query.mealType || query.mealTypes);
+    const regions = parseArrayParam(query.region || query.regions);
+    const countries = parseStringArrayParam(query.country || query.countries);
+    const diets = parseArrayParam(query.diet || query.diets);
+    const exclude = parseArrayParam(query.exclude);
+
+    const rawCalories = Number.parseInt(query.maxCalories, 10);
+    const maxCalories = Number.isFinite(rawCalories) && rawCalories > 0 ? rawCalories : null;
+
+    const rawTime = Number.parseInt(query.maxTime, 10);
+    const maxTime = Number.isFinite(rawTime) && rawTime > 0 ? rawTime : null;
+
+    return { page, limit, sort, search, mealTypes, regions, countries, diets, exclude, maxCalories, maxTime };
 };
 
 /**
@@ -57,31 +92,66 @@ const parseListQuery = (query) => {
  * decides *which* recipes are in scope — public ones, or one user's own.
  */
 async function listRecipes(baseMatch, query) {
-    const { page, limit, sort, search } = parseListQuery(query);
+    const { page, limit, sort, search, mealTypes, regions, countries, diets, exclude, maxCalories, maxTime } = parseListQuery(query);
 
     const match = { ...baseMatch };
+
+    const andConditions = [];
+
     if (search) {
         const pattern = new RegExp(escapeRegex(search), 'i');
-        match.$or = [{ title: pattern }, { ingredients: pattern }];
+        andConditions.push({ $or: [{ title: pattern }, { ingredients: pattern }] });
     }
 
-    const [facet] = await Recipes.aggregate([
-        { $match: match },
-        {
-            $addFields: {
-                titleSort: { $toLower: '$title' },
-                timeSort: {
-                    $convert: { input: '$time', to: 'int', onError: UNSORTABLE_TIME, onNull: UNSORTABLE_TIME },
-                },
-                // Recipes saved before thumbnails existed only have the full
-                // image; falling back keeps their cards from going blank.
-                thumbnail: { $ifNull: ['$thumbnail', '$image'] },
+    if (mealTypes.length > 0) {
+        andConditions.push({ mealTypes: { $in: mealTypes } });
+    }
+
+    if (regions.length > 0) {
+        andConditions.push({ regions: { $in: regions } });
+    }
+
+    if (countries.length > 0) {
+        const countryRegexes = countries.map((c) => new RegExp(escapeRegex(c), 'i'));
+        andConditions.push({ countries: { $in: countryRegexes } });
+    }
+
+    if (diets.length > 0) {
+        andConditions.push({ diets: { $all: diets } });
+    }
+
+    if (exclude.length > 0) {
+        andConditions.push({ allergens: { $nin: exclude } });
+        for (const term of exclude) {
+            andConditions.push({ ingredients: { $not: new RegExp(escapeRegex(term), 'i') } });
+        }
+    }
+
+    if (maxCalories !== null) {
+        andConditions.push({ calories: { $lte: maxCalories, $ne: null } });
+    }
+
+    if (andConditions.length > 0) {
+        match.$and = andConditions;
+    }
+
+    const pipeline = [{ $match: match }];
+
+    pipeline.push({
+        $addFields: {
+            titleSort: { $toLower: '$title' },
+            timeSort: {
+                $convert: { input: '$time', to: 'int', onError: UNSORTABLE_TIME, onNull: UNSORTABLE_TIME },
             },
+            thumbnail: { $ifNull: ['$thumbnail', '$image'] },
         },
-        // Dropped before the sort, so the base64 payload is never carried
-        // through it. Everything past this point is small. The nutrient table
-        // goes the same way: cards show the calorie figure and nothing else,
-        // and the dialog fetches the whole recipe anyway.
+    });
+
+    if (maxTime !== null) {
+        pipeline.push({ $match: { timeSort: { $lte: maxTime } } });
+    }
+
+    pipeline.push(
         { $project: { image: 0, instructions: 0, nutrients: 0 } },
         { $sort: SORTS[sort] },
         {
@@ -94,7 +164,9 @@ async function listRecipes(baseMatch, query) {
                 total: [{ $count: 'value' }],
             },
         },
-    ]);
+    );
+
+    const [facet] = await Recipes.aggregate(pipeline);
 
     const total = facet?.total?.[0]?.value ?? 0;
 

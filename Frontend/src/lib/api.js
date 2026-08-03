@@ -62,12 +62,21 @@ export const authApi = {
 };
 
 /** Serialises the list controls into the query string the backend expects. */
-function listQuery({ search, sort, page, limit }) {
+function listQuery({ search, sort, page, limit, mealType, region, country, diet, exclude, maxCalories, maxTime }) {
   const params = new URLSearchParams();
   if (search) params.set('search', search);
   if (sort) params.set('sort', sort);
   if (page && page > 1) params.set('page', String(page));
   if (limit) params.set('limit', String(limit));
+
+  if (mealType) params.set('mealType', Array.isArray(mealType) ? mealType.join(',') : mealType);
+  if (region) params.set('region', Array.isArray(region) ? region.join(',') : region);
+  if (country) params.set('country', Array.isArray(country) ? country.join(',') : country);
+  if (diet) params.set('diet', Array.isArray(diet) ? diet.join(',') : diet);
+  if (exclude) params.set('exclude', Array.isArray(exclude) ? exclude.join(',') : exclude);
+  if (maxCalories) params.set('maxCalories', String(maxCalories));
+  if (maxTime) params.set('maxTime', String(maxTime));
+
   const query = params.toString();
   return query ? `?${query}` : '';
 }

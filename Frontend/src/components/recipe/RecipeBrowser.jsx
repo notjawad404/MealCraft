@@ -70,6 +70,47 @@ export default function RecipeBrowser({
   const sort = isSort(sortParam) ? sortParam : DEFAULT_SORT;
   const page = Math.max(1, Number(params.get('page')) || 1);
 
+  const getArrayParam = (key) => {
+    const val = params.get(key);
+    if (!val) return [];
+    return val.split(',').map((s) => s.trim()).filter(Boolean);
+  };
+
+  const filters = {
+    diet: getArrayParam('diet'),
+    mealType: getArrayParam('mealType'),
+    region: getArrayParam('region'),
+    country: getArrayParam('country'),
+    exclude: getArrayParam('exclude'),
+    maxCalories: params.get('maxCalories') ?? '',
+    maxTime: params.get('maxTime') ?? '',
+  };
+
+  const handleFilterChange = (updatedFilters) => {
+    const changes = { page: null };
+    for (const [key, val] of Object.entries(updatedFilters)) {
+      if (Array.isArray(val)) {
+        changes[key] = val.length > 0 ? val.join(',') : null;
+      } else {
+        changes[key] = val ? String(val) : null;
+      }
+    }
+    patchParams(changes);
+  };
+
+  const handleClearFilters = () => {
+    patchParams({
+      diet: null,
+      mealType: null,
+      region: null,
+      country: null,
+      exclude: null,
+      maxCalories: null,
+      maxTime: null,
+      page: null,
+    });
+  };
+
   // The box is local so typing stays instant; the URL only catches up once the
   // typing settles.
   const [searchInput, setSearchInput] = useState(search);
@@ -108,7 +149,20 @@ export default function RecipeBrowser({
 
     setState((previous) => ({ ...previous, pending: true }));
 
-    fetchPage({ search, sort, page, limit: PAGE_SIZE, signal: controller.signal })
+    fetchPage({
+      search,
+      sort,
+      page,
+      limit: PAGE_SIZE,
+      mealType: filters.mealType,
+      region: filters.region,
+      country: filters.country,
+      diet: filters.diet,
+      exclude: filters.exclude,
+      maxCalories: filters.maxCalories,
+      maxTime: filters.maxTime,
+      signal: controller.signal,
+    })
       .then((data) =>
         setState({
           data: normalizePage(data, { page, limit: PAGE_SIZE }),
@@ -124,7 +178,20 @@ export default function RecipeBrowser({
       });
 
     return () => controller.abort();
-  }, [fetchPage, search, sort, page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    fetchPage,
+    search,
+    sort,
+    page,
+    params.get('diet'),
+    params.get('mealType'),
+    params.get('region'),
+    params.get('country'),
+    params.get('exclude'),
+    params.get('maxCalories'),
+    params.get('maxTime'),
+  ]);
 
   // Reachable by editing the URL, or by landing on a deep page whose recipes
   // have since been deleted.
@@ -188,6 +255,9 @@ export default function RecipeBrowser({
         fetchSuggestions={fetchSuggestions}
         sort={sort}
         onSortChange={(value) => patchParams({ sort: value === DEFAULT_SORT ? null : value, page: null })}
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onClearFilters={handleClearFilters}
         placeholder={searchPlaceholder}
         summary={data ? `${total} ${total === 1 ? 'recipe' : 'recipes'}` : null}
       />
