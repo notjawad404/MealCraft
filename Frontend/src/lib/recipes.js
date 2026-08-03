@@ -32,7 +32,10 @@ const num = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value)
  */
 export function normalizePage(data, { page = 1, limit = PAGE_SIZE } = {}) {
   if (Array.isArray(data)) {
-    return { recipes: data, page: 1, pages: 1, total: data.length, limit };
+    // `stale` is surfaced in the UI. Degrading quietly here once cost two
+    // rounds of "search does nothing" — the old API ignores every query
+    // param, so the page flickers and returns the identical list.
+    return { recipes: data, page: 1, pages: 1, total: data.length, limit, stale: true };
   }
   if (!data || !Array.isArray(data.recipes)) {
     return { recipes: [], page: 1, pages: 1, total: 0, limit };

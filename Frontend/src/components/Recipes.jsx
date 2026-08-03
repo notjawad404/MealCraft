@@ -7,6 +7,7 @@ import RecipeBrowser from './recipe/RecipeBrowser';
 /** Everything anyone has chosen to publish. Open to signed-out visitors. */
 export default function Recipes() {
   const fetchPage = useCallback((options) => recipeApi.list(options), []);
+  const fetchSuggestions = useCallback((options) => recipeApi.suggest(options), []);
 
   return (
     <section className="relative overflow-hidden">
@@ -31,6 +32,7 @@ export default function Recipes() {
         <div className="mt-12">
           <RecipeBrowser
             fetchPage={fetchPage}
+            fetchSuggestions={fetchSuggestions}
             searchPlaceholder="Search by title or ingredient"
             emptyTitle="Nothing published yet"
             emptyBody="No one has made a recipe public so far. Yours could be the first one here."

@@ -10,6 +10,7 @@ export default function MyRecipes() {
   const { user, token } = useAuth();
 
   const fetchPage = useCallback((options) => recipeApi.mine(token, options), [token]);
+  const fetchSuggestions = useCallback((options) => recipeApi.suggestMine(token, options), [token]);
 
   return (
     <section className="relative overflow-hidden">
@@ -34,6 +35,7 @@ export default function MyRecipes() {
         <div className="mt-12">
           <RecipeBrowser
             fetchPage={fetchPage}
+            fetchSuggestions={fetchSuggestions}
             showVisibility
             searchPlaceholder="Search your recipes"
             emptyTitle="Your cookbook is empty"

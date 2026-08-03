@@ -81,4 +81,11 @@ export const recipeApi = {
   /** The signed-in user's own recipes, public and private. */
   mine: (token, { signal, ...options } = {}) =>
     apiRequest(`/recipe/user${listQuery(options)}`, { token, signal }),
+
+  /** Up to five matching titles, for the search box. `{ suggestions: [...] }`. */
+  suggest: ({ search, signal } = {}) =>
+    apiRequest(`/recipe/suggest?search=${encodeURIComponent(search ?? '')}`, { signal }),
+
+  suggestMine: (token, { search, signal } = {}) =>
+    apiRequest(`/recipe/user/suggest?search=${encodeURIComponent(search ?? '')}`, { token, signal }),
 };

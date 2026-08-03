@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { SORT_OPTIONS } from '../../lib/recipes';
+import SearchBox from './SearchBox';
 
 /**
  * Search box and sort picker. The search value is the caller's raw input — it
@@ -9,57 +10,22 @@ import { SORT_OPTIONS } from '../../lib/recipes';
 export default function RecipeToolbar({
   search,
   onSearchChange,
+  fetchSuggestions,
   sort,
   onSortChange,
   placeholder = 'Search recipes',
   summary,
 }) {
-  const searchId = useId();
   const sortId = useId();
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-      <div className="relative flex-1">
-        <label htmlFor={searchId} className="sr-only">
-          Search recipes
-        </label>
-
-        <svg
-          viewBox="0 0 24 24"
-          className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-ink-400"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          aria-hidden="true"
-        >
-          <circle cx="11" cy="11" r="6.5" />
-          <path d="m16 16 4.5 4.5" />
-        </svg>
-
-        <input
-          id={searchId}
-          type="search"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={placeholder}
-          className="field pl-11 pr-10"
-        />
-
-        {search && (
-          <button
-            type="button"
-            onClick={() => onSearchChange('')}
-            aria-label="Clear search"
-            className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg
-                       text-ink-400 transition-colors hover:text-ink-800 dark:hover:text-ink-100"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        )}
-      </div>
+      <SearchBox
+        value={search}
+        onChange={onSearchChange}
+        placeholder={placeholder}
+        fetchSuggestions={fetchSuggestions}
+      />
 
       <div className="flex items-center gap-3">
         <label

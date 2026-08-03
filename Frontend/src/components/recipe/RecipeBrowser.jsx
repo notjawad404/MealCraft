@@ -12,7 +12,7 @@ const GRID = 'grid gap-6 sm:grid-cols-2 lg:grid-cols-3';
 function Skeletons() {
   return (
     <div className={GRID} aria-hidden="true">
-      {Array.from({ length: 6 }, (_, i) => (
+      {Array.from({ length: 9 }, (_, i) => (
         <div
           key={i}
           className="animate-pulse overflow-hidden rounded-[1.5rem] border border-ink-200 bg-white dark:border-night-600 dark:bg-night-800"
@@ -53,6 +53,7 @@ function Empty({ title, body, action }) {
  */
 export default function RecipeBrowser({
   fetchPage,
+  fetchSuggestions,
   emptyTitle,
   emptyBody,
   emptyAction,
@@ -71,7 +72,11 @@ export default function RecipeBrowser({
   const [searchInput, setSearchInput] = useState(search);
   const debouncedSearch = useDebouncedValue(searchInput.trim(), 350);
 
-  const [state, setState] = useState({ status: 'loading', data: null, error: '' });
+  // `data` deliberately survives across fetches. Blanking it and dropping back
+  // to skeletons on every keystroke, sort or page turn is what made the grid
+  // flicker; instead the previous results stay put and dim until the new ones
+  // land. Skeletons are then only ever seen once, on the very first load.
+  const [state, setState] = useState({ data: null, error: '', pending: true });
 
   const patchParams = (changes, options) =>
     setParams((previous) => {
@@ -95,19 +100,21 @@ export default function RecipeBrowser({
   useEffect(() => {
     const controller = new AbortController();
 
-    setState((previous) => ({ ...previous, status: 'loading' }));
+    setState((previous) => ({ ...previous, pending: true }));
 
     fetchPage({ search, sort, page, limit: PAGE_SIZE, signal: controller.signal })
       .then((data) =>
         setState({
-          status: 'ready',
           data: normalizePage(data, { page, limit: PAGE_SIZE }),
           error: '',
+          pending: false,
         }),
       )
       .catch((err) => {
         if (controller.signal.aborted) return;
-        setState({ status: 'error', data: null, error: err.message });
+        // The last good results are kept underneath the error, so a dropped
+        // request does not wipe the page out.
+        setState((previous) => ({ ...previous, error: err.message, pending: false }));
       });
 
     return () => controller.abort();
@@ -128,53 +135,104 @@ export default function RecipeBrowser({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const { error, pending } = state;
   const total = data?.total ?? 0;
+
+  // A local API answers in tens of milliseconds. Dimming the grid for that long
+  // is just a blink — a second kind of flicker, in place of the one being
+  // fixed. So the loading treatment waits to see whether the request is
+  // actually slow enough to be worth mentioning; most of the time it never
+  // appears at all and the swap looks instant.
+  const [showPending, setShowPending] = useState(false);
+  useEffect(() => {
+    if (!pending) {
+      setShowPending(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setShowPending(true), 180);
+    return () => clearTimeout(timer);
+  }, [pending]);
+
+  // Skeletons belong to the cold start only — every later fetch has something
+  // real to show while it waits.
+  const firstLoad = pending && !data;
 
   return (
     <div className="space-y-8">
       <RecipeToolbar
         search={searchInput}
         onSearchChange={setSearchInput}
+        fetchSuggestions={fetchSuggestions}
         sort={sort}
         onSortChange={(value) => patchParams({ sort: value === DEFAULT_SORT ? null : value, page: null })}
         placeholder={searchPlaceholder}
-        summary={
-          state.status === 'ready'
-            ? `${total} ${total === 1 ? 'recipe' : 'recipes'}`
-            : null
-        }
+        summary={data ? `${total} ${total === 1 ? 'recipe' : 'recipes'}` : null}
       />
 
-      {state.status === 'error' && <FormAlert>{state.error}</FormAlert>}
+      {error && <FormAlert>{error}</FormAlert>}
 
-      {state.status === 'loading' && <Skeletons />}
-
-      {state.status === 'ready' && data.recipes.length === 0 && (
-        search ? (
-          <Empty
-            title="Nothing matches that"
-            body={`No recipe here mentions “${search}”. Try a different ingredient or title.`}
-            action={
-              <button type="button" onClick={() => setSearchInput('')} className="btn-ghost">
-                Clear search
-              </button>
-            }
-          />
-        ) : (
-          <Empty title={emptyTitle} body={emptyBody} action={emptyAction} />
-        )
+      {data?.stale && (
+        <p
+          role="alert"
+          className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3.5
+                     text-sm leading-relaxed text-amber-900
+                     dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 4 2.5 20h19L12 4Z" />
+            <path d="M12 10v4M12 17.2v.3" />
+          </svg>
+          <span>
+            The API is running an older version that ignores search, sorting and
+            paging — everything is on one page below. Restart the backend to fix
+            it.
+          </span>
+        </p>
       )}
 
-      {state.status === 'ready' && data.recipes.length > 0 && (
-        <>
-          <div className={GRID}>
-            {data.recipes.map((recipe) => (
-              <RecipeCard key={recipe._id} recipe={recipe} showVisibility={showVisibility} />
-            ))}
-          </div>
+      {/* Always 2px tall, present or not, so nothing shifts when it appears. */}
+      <div className="h-0.5 overflow-hidden rounded-full" aria-hidden="true">
+        {showPending && !firstLoad && (
+          <div className="h-full w-1/3 animate-progress rounded-full bg-ember-500 dark:bg-ember-400" />
+        )}
+      </div>
 
-          <Pagination page={data.page} pages={data.pages} onChange={goToPage} />
-        </>
+      {firstLoad && showPending && <Skeletons />}
+
+      {data && (
+        <div
+          // Dimmed rather than unmounted while the next page is in flight, and
+          // inert so a second click cannot land on results about to be replaced.
+          className={`transition-opacity duration-200 ease-out ${
+            showPending ? 'pointer-events-none opacity-40' : 'opacity-100'
+          }`}
+        >
+          {data.recipes.length === 0 ? (
+            search ? (
+              <Empty
+                title="Nothing matches that"
+                body={`No recipe here mentions “${search}”. Try a different ingredient or title.`}
+                action={
+                  <button type="button" onClick={() => setSearchInput('')} className="btn-ghost">
+                    Clear search
+                  </button>
+                }
+              />
+            ) : (
+              <Empty title={emptyTitle} body={emptyBody} action={emptyAction} />
+            )
+          ) : (
+            <div className="space-y-8">
+              <div className={GRID}>
+                {data.recipes.map((recipe) => (
+                  <RecipeCard key={recipe._id} recipe={recipe} showVisibility={showVisibility} />
+                ))}
+              </div>
+
+              <Pagination page={data.page} pages={data.pages} onChange={goToPage} />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

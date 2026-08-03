@@ -96,6 +96,48 @@ async function listRecipes(baseMatch, query) {
     };
 }
 
+const SUGGESTION_LIMIT = 5;
+
+/**
+ * Titles only, for the search box's type-ahead. Deliberately narrower than the
+ * listing search, which also looks inside ingredients: a dropdown of titles
+ * that do not visibly contain what you typed reads as broken.
+ */
+async function suggestTitles(baseMatch, query) {
+    const search = text(query.search).slice(0, 100);
+    if (!search) return [];
+
+    return Recipes.find({ ...baseMatch, title: new RegExp(escapeRegex(search), 'i') })
+        .select('title')
+        .sort({ title: 1 })
+        .collation({ locale: 'en', strength: 2 }) // so "apple" is not exiled below "Zabaglione"
+        .limit(SUGGESTION_LIMIT)
+        .lean();
+}
+
+// Title suggestions across public recipes
+const suggestRecipes = async (req, res, next) => {
+    try {
+        return res.json({ suggestions: await suggestTitles({ isPublic: true }, req.query) });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Title suggestions across the logged-in user's own recipes
+const suggestMyRecipes = async (req, res, next) => {
+    try {
+        if (!mongoose.isValidObjectId(req.user.userId)) {
+            return res.status(401).json({ message: 'Invalid or expired token' });
+        }
+        const createdBy = new mongoose.Types.ObjectId(req.user.userId);
+
+        return res.json({ suggestions: await suggestTitles({ createdBy }, req.query) });
+    } catch (err) {
+        next(err);
+    }
+};
+
 // Get public recipes — paged, searchable, sortable
 const getRecipes = async (req, res, next) => {
     try {
@@ -251,4 +293,13 @@ const deleteRecipe = async (req, res, next) => {
     }
 };
 
-module.exports = { getRecipes, getMyRecipes, getRecipe, addRecipe, editRecipe, deleteRecipe };
+module.exports = {
+    getRecipes,
+    getMyRecipes,
+    getRecipe,
+    suggestRecipes,
+    suggestMyRecipes,
+    addRecipe,
+    editRecipe,
+    deleteRecipe,
+};
