@@ -105,6 +105,47 @@
            dark:focus:border-ember-400 dark:focus:ring-ember-400/20;
   }
 
+  /* ---- Video player ---- */
+
+  /*
+   * Scrub and volume bars. The track is painted with a gradient rather than
+   * with extra elements, so `--played` (and `--buffered`, on the scrubber) are
+   * the only things the player has to set: past those two stops the gradient
+   * turns transparent and the element's own background shows through.
+   *
+   * appearance-none loses the thumb as well as the track, hence the two vendor
+   * rules — without them the control is invisible, not merely unstyled.
+   */
+  .video-range {
+    @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/25;
+    background-image: linear-gradient(
+      to right,
+      theme(colors.ember.500) 0 var(--played, 0%),
+      rgb(255 255 255 / 0.4) var(--played, 0%) var(--buffered, 0%),
+      transparent var(--buffered, 0%)
+    );
+    background-repeat: no-repeat;
+  }
+
+  .video-range::-webkit-slider-thumb {
+    @apply h-3.5 w-3.5 appearance-none rounded-full bg-ember-500 shadow-card transition-transform;
+  }
+
+  .video-range:hover::-webkit-slider-thumb {
+    @apply scale-125;
+  }
+
+  .video-range::-moz-range-thumb {
+    @apply h-3.5 w-3.5 rounded-full border-0 bg-ember-500;
+  }
+
+  /* Native <dialog> brings the focus trap and the escape key with it; only the
+     backdrop needs saying. */
+  .app-dialog::backdrop {
+    background-color: rgb(23 19 15 / 0.82);
+    backdrop-filter: blur(3px);
+  }
+
   /* ---- Decorative ---- */
   .grain {
     @apply pointer-events-none absolute inset-0 bg-grain opacity-[0.035] mix-blend-multiply;

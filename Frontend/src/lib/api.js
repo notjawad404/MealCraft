@@ -78,6 +78,13 @@ export const recipeApi = {
   /** Public recipes. Returns `{ recipes, page, pages, total, limit }`. */
   list: ({ signal, ...options } = {}) => apiRequest(`/recipe${listQuery(options)}`, { signal }),
 
+  /**
+   * One whole recipe. Listings leave out the method and the full-size image to
+   * keep a page of twenty small, so anything showing a recipe in full has to
+   * come back for it.
+   */
+  get: (id, { signal } = {}) => apiRequest(`/recipe/${id}`, { signal }),
+
   /** The signed-in user's own recipes, public and private. */
   mine: (token, { signal, ...options } = {}) =>
     apiRequest(`/recipe/user${listQuery(options)}`, { token, signal }),
@@ -88,4 +95,31 @@ export const recipeApi = {
 
   suggestMine: (token, { search, signal } = {}) =>
     apiRequest(`/recipe/user/suggest?search=${encodeURIComponent(search ?? '')}`, { token, signal }),
+
+  /*
+   * Likes and favourites. No page uses these yet — they are the API the
+   * favourites and likes pages will be built on.
+   *
+   * Setting and clearing are separate calls rather than one toggle, so a
+   * double-tapped heart cannot land back where it started: every one of these
+   * can be sent twice and mean the same thing. Each answers with the flag and
+   * the recipe's new total, e.g. `{ liked: true, likeCount: 12 }`.
+   */
+  like: (id, token) => apiRequest(`/recipe/${id}/like`, { method: 'PUT', token }),
+  unlike: (id, token) => apiRequest(`/recipe/${id}/like`, { method: 'DELETE', token }),
+  favourite: (id, token) => apiRequest(`/recipe/${id}/favourite`, { method: 'PUT', token }),
+  unfavourite: (id, token) => apiRequest(`/recipe/${id}/favourite`, { method: 'DELETE', token }),
+
+  /** Both paged like every other listing: `{ recipes, page, pages, total }`. */
+  liked: (token, { signal, ...options } = {}) =>
+    apiRequest(`/recipe/saved/likes${listQuery(options)}`, { token, signal }),
+  favourites: (token, { signal, ...options } = {}) =>
+    apiRequest(`/recipe/saved/favourites${listQuery(options)}`, { token, signal }),
+
+  /**
+   * `{ likes: [id], favourites: [id] }` for the signed-in user — one call on
+   * load is enough to draw every heart on a page in its right state, and it
+   * keeps the listing endpoints unauthenticated.
+   */
+  saved: (token, { signal } = {}) => apiRequest('/recipe/saved/ids', { token, signal }),
 };

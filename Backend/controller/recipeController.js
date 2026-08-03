@@ -1,6 +1,17 @@
 const mongoose = require('mongoose');
 const Recipes = require('../model/recipeModel');
+const RecipeInteraction = require('../model/recipeInteractionModel');
 const { inspectImageDataUrl, MAX_THUMBNAIL_BYTES } = require('../utils/imageData');
+const { normalizeVideoUrl } = require('../utils/videoUrl');
+const {
+    normalizeAllergens,
+    normalizeDiets,
+    normalizeMealTypes,
+    normalizeRegions,
+    normalizeCountries,
+    findDietConflict,
+} = require('../utils/recipeTags');
+const { normalizeServings, normalizeCalories, normalizeNutrients } = require('../utils/nutrition');
 
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -68,8 +79,10 @@ async function listRecipes(baseMatch, query) {
             },
         },
         // Dropped before the sort, so the base64 payload is never carried
-        // through it. Everything past this point is small.
-        { $project: { image: 0, instructions: 0 } },
+        // through it. Everything past this point is small. The nutrient table
+        // goes the same way: cards show the calorie figure and nothing else,
+        // and the dialog fetches the whole recipe anyway.
+        { $project: { image: 0, instructions: 0, nutrients: 0 } },
         { $sort: SORTS[sort] },
         {
             $facet: {
@@ -196,6 +209,57 @@ const checkImages = ({ image, thumbnail }) => {
     return null;
 };
 
+// Every optional field, paired with the function that vets it. Each normalizer
+// answers `{ ok: true, <key>: value }` or `{ ok: false, message }`, so the loop
+// below does not need to know anything about what it is checking.
+const OPTIONAL_FIELDS = [
+    ['allergens', normalizeAllergens],
+    ['diets', normalizeDiets],
+    ['mealTypes', normalizeMealTypes],
+    ['regions', normalizeRegions],
+    ['countries', normalizeCountries],
+    ['servings', normalizeServings],
+    ['calories', normalizeCalories],
+    ['nutrients', normalizeNutrients],
+];
+
+/**
+ * Validates every optional field off a request body: the video link, the
+ * allergen and dietary lists, when and where the food is eaten, and the
+ * per-serving figures.
+ *
+ * Keys the caller did not send are left out of the returned patch entirely, so
+ * the same helper backs both the create — where absent means "none", handled
+ * by the schema defaults — and the edit, where absent means "leave alone".
+ *
+ * @returns {{ patch: object } | { error: string }}
+ */
+const readOptionalFields = (body) => {
+    const patch = {};
+
+    if (body.videoUrl !== undefined) {
+        const raw = text(body.videoUrl);
+        if (!raw) {
+            patch.videoUrl = ''; // an emptied field is how the link is removed
+        } else {
+            const link = normalizeVideoUrl(raw);
+            if (!link.ok) return { error: link.message };
+            patch.videoUrl = link.url;
+        }
+    }
+
+    for (const [key, normalize] of OPTIONAL_FIELDS) {
+        if (body[key] === undefined) continue;
+        const result = normalize(body[key]);
+        if (!result.ok) return { error: result.message };
+        // Normalizers answer under their own key — `value` for the plain
+        // numbers, the field's own name for the lists.
+        patch[key] = key in result ? result[key] : result.value;
+    }
+
+    return { patch };
+};
+
 // Add a new recipe
 const addRecipe = async (req, res, next) => {
     try {
@@ -223,6 +287,16 @@ const addRecipe = async (req, res, next) => {
             return res.status(400).json({ message: imageError });
         }
 
+        const optional = readOptionalFields(req.body);
+        if (optional.error) {
+            return res.status(400).json({ message: optional.error });
+        }
+
+        const conflict = findDietConflict(optional.patch.diets, optional.patch.allergens);
+        if (conflict) {
+            return res.status(400).json({ message: conflict });
+        }
+
         const recipe = await Recipes.create({
             title,
             ingredients,
@@ -230,6 +304,7 @@ const addRecipe = async (req, res, next) => {
             time,
             image: image || undefined,
             thumbnail: thumbnail || undefined,
+            ...optional.patch,
             username,
             createdBy: req.user.userId,
             isPublic: isPublic !== undefined ? Boolean(isPublic) : true,
@@ -264,7 +339,22 @@ const editRecipe = async (req, res, next) => {
             return res.status(400).json({ message: imageError });
         }
 
-        const patch = { title, ingredients, instructions, time, image, thumbnail };
+        const optional = readOptionalFields(req.body);
+        if (optional.error) {
+            return res.status(400).json({ message: optional.error });
+        }
+
+        // Either list can be missing from an edit, so the check runs against
+        // what the recipe would end up with rather than what was sent.
+        const conflict = findDietConflict(
+            optional.patch.diets ?? recipe.diets,
+            optional.patch.allergens ?? recipe.allergens,
+        );
+        if (conflict) {
+            return res.status(400).json({ message: conflict });
+        }
+
+        const patch = { title, ingredients, instructions, time, image, thumbnail, ...optional.patch };
         if (isPublic !== undefined) patch.isPublic = Boolean(isPublic);
         const updated = await Recipes.findByIdAndUpdate(req.params.id, patch, { new: true });
 
@@ -287,6 +377,10 @@ const deleteRecipe = async (req, res, next) => {
         }
 
         await Recipes.findByIdAndDelete(req.params.id);
+        // Otherwise every user who saved it keeps a row pointing at nothing,
+        // and their favourites page quietly comes up one short.
+        await RecipeInteraction.deleteMany({ recipe: recipe._id });
+
         return res.json({ message: 'Recipe deleted' });
     } catch (err) {
         next(err);
@@ -294,6 +388,9 @@ const deleteRecipe = async (req, res, next) => {
 };
 
 module.exports = {
+    // Not a route handler: controller/interactionController.js reuses it so the
+    // favourites and likes pages page, search and sort exactly as these do.
+    listRecipes,
     getRecipes,
     getMyRecipes,
     getRecipe,
