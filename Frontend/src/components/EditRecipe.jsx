@@ -30,7 +30,7 @@ function toFormValues(recipe) {
     nutrients: recipe.nutrients ?? [],
     videoUrl: recipe.videoUrl ?? '',
     image: recipe.image ?? '',
-    thumbnail: recipe.thumbnail ?? '',
+    photo: null,
     isPublic: recipe.isPublic !== false,
   };
 }
@@ -79,8 +79,8 @@ export default function EditRecipe() {
 
   // Thrown errors are left for RecipeForm's banner, so a rejected save keeps
   // everything that was typed.
-  const handleSubmit = async (payload) => {
-    await recipeApi.update(id, payload, token);
+  const handleSubmit = async (payload, photo) => {
+    await recipeApi.update(id, payload, token, photo);
     navigate('/my-recipes');
   };
 

@@ -57,7 +57,10 @@ const corsOptions = {
 // error that throws at startup and takes the whole app down with it.
 app.use(cors(corsOptions));
 
-app.use(express.json({ limit: '4mb' }));
+// Recipe photos travel as binary multipart, handled by middleware/recipeUpload.js
+// on the two routes that take one. Nothing else this API accepts is large, so
+// the JSON ceiling only has to cover a long method and an ingredient list.
+app.use(express.json({ limit: '512kb' }));
 
 app.get('/', (req, res) => {
     res.send('API is running...');

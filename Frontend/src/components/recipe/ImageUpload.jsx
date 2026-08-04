@@ -1,44 +1,61 @@
-import { useId, useRef, useState } from 'react';
-import { ACCEPTED_TYPES, ImageError, fileToDataUrl, formatBytes } from '../../lib/image';
+import { useEffect, useId, useRef, useState } from 'react';
+import { ACCEPTED_TYPES, ImageError, formatBytes, optimizeImage } from '../../lib/image';
 
 /**
- * Picks an image and hands back two base64 data URIs — the full picture and the
- * small copy listings use — ready to be stored on the recipe document. Encoding
- * happens here rather than at submit time so the size of what will actually be
- * sent is visible before anyone commits to it.
+ * Picks a photo, shrinks it, and hands back the Blob that will be uploaded.
  *
- * `onChange` receives `{ image, thumbnail }`, both empty strings when cleared.
+ * The work happens here rather than at submit time so the cost of the picture
+ * is visible before anyone commits to it — and so a 6 MB phone photo has
+ * already become a couple of hundred kilobytes by the time Save is pressed.
+ *
+ * `onChange` receives `{ file, url }`. `file` is a newly picked Blob to upload;
+ * `url` is the photo the recipe already has, which on an edit is the Cloudinary
+ * URL the backend wrote last time. Both are null/'' once the photo is removed.
  */
-export default function ImageUpload({ value, onChange, disabled }) {
+export default function ImageUpload({ file, url, onChange, disabled }) {
   const inputId = useId();
   const inputRef = useRef(null);
 
   const [dragging, setDragging] = useState(false);
-  const [encoding, setEncoding] = useState(false);
+  const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
   const [meta, setMeta] = useState(null);
+  const [preview, setPreview] = useState('');
 
-  const accept = async (file) => {
-    if (!file) return;
+  // A Blob has no address until one is minted for it, and each one holds the
+  // Blob in memory until it is revoked — hence the cleanup on replacement and
+  // on unmount. A photo the recipe already has is just a URL and needs neither.
+  useEffect(() => {
+    if (!file) {
+      setPreview('');
+      return undefined;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+
+  const accept = async (picked) => {
+    if (!picked) return;
     setError('');
-    setEncoding(true);
+    setWorking(true);
     try {
-      const result = await fileToDataUrl(file);
-      onChange({ image: result.dataUrl, thumbnail: result.thumbnail });
-      setMeta({ bytes: result.bytes, width: result.width, height: result.height });
+      const result = await optimizeImage(picked);
+      onChange({ file: result.blob, url: '' });
+      setMeta(result);
     } catch (err) {
-      onChange({ image: '', thumbnail: '' });
+      onChange({ file: null, url: '' });
       setMeta(null);
       setError(err instanceof ImageError ? err.message : 'That image could not be processed.');
     } finally {
-      setEncoding(false);
+      setWorking(false);
       // Let the same file be picked again after a removal.
       if (inputRef.current) inputRef.current.value = '';
     }
   };
 
   const clear = () => {
-    onChange({ image: '', thumbnail: '' });
+    onChange({ file: null, url: '' });
     setMeta(null);
     setError('');
   };
@@ -49,22 +66,36 @@ export default function ImageUpload({ value, onChange, disabled }) {
     if (!disabled) accept(e.dataTransfer.files?.[0]);
   };
 
+  const shown = preview || url;
+
   return (
     <div>
       <span className="label">Photo · optional</span>
 
-      {value ? (
+      {shown ? (
         <figure className="overflow-hidden rounded-2xl border border-ink-200 bg-white dark:border-night-600 dark:bg-night-800">
           <img
-            src={value}
+            src={shown}
             alt="Preview of the photo attached to this recipe"
             className="h-56 w-full object-cover"
           />
           <figcaption className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <span className="text-xs text-ink-500 dark:text-ink-400">
-              {meta
-                ? `${meta.width}×${meta.height} · ${formatBytes(meta.bytes)} stored`
-                : 'Attached'}
+              {meta ? (
+                <>
+                  {meta.width}×{meta.height} ·{' '}
+                  {meta.originalBytes > meta.bytes ? (
+                    <>
+                      <span className="line-through opacity-60">{formatBytes(meta.originalBytes)}</span>{' '}
+                      → <span className="font-semibold text-sage-700 dark:text-sage-300">{formatBytes(meta.bytes)}</span>
+                    </>
+                  ) : (
+                    formatBytes(meta.bytes)
+                  )}
+                </>
+              ) : (
+                'Attached'
+              )}
             </span>
             <span className="flex gap-2">
               <button
@@ -104,7 +135,7 @@ export default function ImageUpload({ value, onChange, disabled }) {
                       }
                       ${disabled ? 'pointer-events-none opacity-60' : ''}`}
         >
-          {encoding ? (
+          {working ? (
             <svg viewBox="0 0 24 24" className="h-6 w-6 animate-spin text-ember-600 dark:text-ember-300" fill="none" aria-hidden="true">
               <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.2" opacity="0.25" />
               <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
@@ -118,10 +149,10 @@ export default function ImageUpload({ value, onChange, disabled }) {
           )}
 
           <span className="text-sm font-semibold text-ink-800 dark:text-ink-100">
-            {encoding ? 'Preparing your photo…' : 'Drop a photo here, or browse'}
+            {working ? 'Shrinking your photo…' : 'Drop a photo here, or browse'}
           </span>
           <span className="text-xs text-ink-500 dark:text-ink-400">
-            JPEG, PNG, WebP or GIF. Large photos are resized automatically.
+            JPEG, PNG, WebP or GIF. Large photos are resized and compressed automatically.
           </span>
         </label>
       )}

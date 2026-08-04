@@ -1,23 +1,28 @@
-// Recipe images are stored inline on the recipe document as base64 data URIs
-// rather than on disk or in object storage, which keeps deployment to a single
-// database and nothing else. The trade-off is that every byte counts twice: once
-// against MongoDB's 16 MB document ceiling, and again on every read of the
-// recipe. Hence the deliberately conservative cap below — the client downscales
-// before it ever gets here, so this is a backstop, not the primary limit.
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+/**
+ * Vetting for an uploaded recipe photo.
+ *
+ * Photos arrive as binary multipart, are checked here, and go straight to
+ * Cloudinary as bytes — base64 is not involved at any point. It used to be:
+ * the image was encoded to a data URI, posted as a JSON field and stored on
+ * the recipe document. That cost a third more bytes on the wire for the
+ * encoding alone, and put the whole picture inside every read of the recipe.
+ *
+ * The client downscales and re-encodes before sending, which is where the real
+ * size control happens (Frontend/src/lib/image.js). This is the backstop for
+ * anything that did not come through the form.
+ */
+const MAX_IMAGE_BYTES = 1024 * 1024;
 
-// Listings return the thumbnail instead of the full image — twenty full-size
-// photos a page is not something anyone wants to download. Keeping the ceiling
-// this low is what makes that trade worthwhile.
-const MAX_THUMBNAIL_BYTES = 192 * 1024;
+// Recipes written before the move to Cloudinary can hold an inline base64
+// image up to the old, laxer ceiling. Nothing accepts a new upload that large,
+// but scripts/migrateImagesToCloudinary.js still has to be able to read one.
+const MAX_LEGACY_IMAGE_BYTES = 2 * 1024 * 1024;
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-const BASE64_ONLY = /^[A-Za-z0-9+/]+={0,2}$/;
-
-// The declared MIME type comes from the client, so it is checked against the
-// file's actual leading bytes. Without this the field would happily store any
-// blob at all under an `image/png` label.
+// The declared type comes from the client, so it is checked against the file's
+// actual leading bytes. Without this the upload would happily forward any blob
+// at all under an `image/png` label.
 const SIGNATURES = {
     'image/jpeg': (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
     'image/png': (b) =>
@@ -27,8 +32,6 @@ const SIGNATURES = {
         b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP',
 };
 
-// Thumbnails are capped well under a megabyte, so rounding everything to MB
-// produces messages like "too large (0.2 MB), the limit is 0.2 MB".
 const formatSize = (bytes) =>
     bytes < 1024 * 1024
         ? `${Math.round(bytes / 1024)} KB`
@@ -37,47 +40,29 @@ const formatSize = (bytes) =>
 const reject = (message) => ({ ok: false, message });
 
 /**
- * Validate a base64 image data URI destined for the `image` or `thumbnail` field.
+ * Check the bytes of an uploaded image against the type it claims to be.
  *
- * @param {unknown} value
- * @param {{ maxBytes?: number, label?: string }} [options]
+ * @param {Buffer} buffer
+ * @param {string} declaredType  the multipart part's Content-Type
+ * @param {{ maxBytes?: number }} [options]
  * @returns {{ ok: true, bytes: number, mime: string } | { ok: false, message: string }}
  */
-function inspectImageDataUrl(value, { maxBytes = MAX_IMAGE_BYTES, label = 'Image' } = {}) {
-    if (typeof value !== 'string') {
-        return reject(`${label} must be a base64 data URI.`);
+function inspectImageBuffer(buffer, declaredType, { maxBytes = MAX_IMAGE_BYTES } = {}) {
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+        return reject('No image data was received.');
     }
 
-    // Parsed by hand rather than with one big regex: the payload runs to
-    // megabytes, and there is no reason to hand that to the regex engine.
-    const comma = value.indexOf(',');
-    if (!value.startsWith('data:') || comma === -1) {
-        return reject(`${label} must be a base64 data URI (data:image/…;base64,…).`);
-    }
-
-    const header = value.slice('data:'.length, comma);
-    if (!header.endsWith(';base64')) {
-        return reject(`${label} must be base64-encoded.`);
-    }
-
-    const mime = header.slice(0, -';base64'.length).toLowerCase();
+    const mime = String(declaredType || '').toLowerCase();
     if (!ALLOWED_TYPES.includes(mime)) {
         return reject(`Unsupported image type. Use ${ALLOWED_TYPES.join(', ')}.`);
     }
 
-    const payload = value.slice(comma + 1);
-    if (!payload || !BASE64_ONLY.test(payload)) {
-        return reject(`${label} data is not valid base64.`);
+    if (buffer.length > maxBytes) {
+        return reject(`Image is too large (${formatSize(buffer.length)}). The limit is ${formatSize(maxBytes)}.`);
     }
 
-    // Checked before decoding so a hostile payload is never materialised in
-    // memory just to be rejected. base64 carries 3 bytes per 4 characters.
-    const bytes = Math.floor((payload.length * 3) / 4) - (payload.endsWith('==') ? 2 : payload.endsWith('=') ? 1 : 0);
-    if (bytes > maxBytes) {
-        return reject(`${label} is too large (${formatSize(bytes)}). The limit is ${formatSize(maxBytes)}.`);
-    }
-
-    const buffer = Buffer.from(payload, 'base64');
+    // Shorter than any real header, so the signature check below would read
+    // past the end of the buffer rather than simply failing.
     if (buffer.length < 12 || !SIGNATURES[mime](buffer)) {
         return reject(`That does not look like a real ${mime.replace('image/', '')} image.`);
     }
@@ -85,4 +70,10 @@ function inspectImageDataUrl(value, { maxBytes = MAX_IMAGE_BYTES, label = 'Image
     return { ok: true, bytes: buffer.length, mime };
 }
 
-module.exports = { inspectImageDataUrl, MAX_IMAGE_BYTES, MAX_THUMBNAIL_BYTES, ALLOWED_TYPES };
+module.exports = {
+    inspectImageBuffer,
+    formatSize,
+    MAX_IMAGE_BYTES,
+    MAX_LEGACY_IMAGE_BYTES,
+    ALLOWED_TYPES,
+};

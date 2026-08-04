@@ -42,8 +42,11 @@ const emptyRecipe = {
   calories: '',
   nutrients: [],
   videoUrl: '',
+  // `image` is the photo the recipe already has, as a Cloudinary URL. `photo`
+  // is a newly picked one, still a Blob — it is uploaded with the save rather
+  // than beforehand, so abandoning the form leaves nothing behind.
   image: '',
-  thumbnail: '',
+  photo: null,
   isPublic: true,
 };
 
@@ -238,11 +241,11 @@ export default function RecipeForm({
         nutrients: packNutrients(values.nutrients),
         videoUrl: values.videoUrl.trim(),
         // Empty rather than omitted, for the same reason: on an edit, a removed
-        // photo has to reach the API as a cleared field, not as silence.
+        // photo has to reach the API as a cleared field, not as silence. A new
+        // photo overrides this server-side, so it is sent either way.
         image: values.image,
-        thumbnail: values.thumbnail,
         isPublic: values.isPublic,
-      });
+      }, values.photo);
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -515,8 +518,9 @@ export default function RecipeForm({
         </Row>
 
         <ImageUpload
-          value={values.image}
-          onChange={({ image, thumbnail }) => setValues((prev) => ({ ...prev, image, thumbnail }))}
+          file={values.photo}
+          url={values.image}
+          onChange={({ file, url }) => setValues((prev) => ({ ...prev, photo: file, image: url }))}
           disabled={pending}
         />
       </Section>

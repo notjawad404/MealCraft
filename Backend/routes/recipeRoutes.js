@@ -20,6 +20,7 @@ const {
 } = require('../controller/interactionController.js');
 const authenticate = require('../middleware/authenticate.js');
 const optionalAuthenticate = require('../middleware/optionalAuthenticate.js');
+const recipeUpload = require('../middleware/recipeUpload.js');
 
 const router = express.Router();
 
@@ -38,8 +39,10 @@ router.get('/saved/favourites', authenticate, getFavouriteRecipes);
 // Open to everyone, but a private recipe is only found by its author — hence
 // the token being read here rather than required.
 router.get('/:id', optionalAuthenticate, getRecipe);
-router.post('/', authenticate, addRecipe);
-router.put('/:id', authenticate, editRecipe);
+// Authenticated first: an unauthenticated request should be turned away before
+// a megabyte of photo is read off the wire, not after.
+router.post('/', authenticate, recipeUpload, addRecipe);
+router.put('/:id', authenticate, recipeUpload, editRecipe);
 router.delete('/:id', authenticate, deleteRecipe);
 
 // Set and unset rather than toggle: two taps racing each other still end up

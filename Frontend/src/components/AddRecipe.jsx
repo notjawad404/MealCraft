@@ -49,8 +49,8 @@ export default function AddRecipe() {
 
   // Errors are thrown back for RecipeForm to show in its banner, so the
   // filled-in form survives a failed save.
-  const handleSubmit = async (payload) => {
-    const recipe = await recipeApi.create({ ...payload, username: user.name }, token);
+  const handleSubmit = async (payload, photo) => {
+    const recipe = await recipeApi.create({ ...payload, username: user.name }, token, photo);
     setSaved(recipe);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };

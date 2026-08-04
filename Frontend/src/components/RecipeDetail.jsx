@@ -231,6 +231,24 @@ export default function RecipeDetail() {
 
                 <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                   <div className="space-y-8">
+                    {/* A recipe with a video gives the hero slot to the player,
+                        which used to mean its photo was never shown at all.
+                        It sits beside the ingredients instead: still on the
+                        page, without pushing the method further down. */}
+                    {recipe.videoUrl && image && (
+                      <figure>
+                        <img
+                          src={image}
+                          alt=""
+                          loading="lazy"
+                          className="aspect-[4/3] w-full rounded-2xl border border-ink-200 object-cover dark:border-night-600"
+                        />
+                        <figcaption className="mt-2 text-xs text-ink-500 dark:text-ink-400">
+                          The finished dish
+                        </figcaption>
+                      </figure>
+                    )}
+
                     <section>
                       <h2 className="font-display text-xl font-semibold text-ink-900 dark:text-paper-50">
                         Ingredients

@@ -16,15 +16,21 @@ export class ApiError extends Error {
 export async function apiRequest(path, { method = 'GET', body, token, signal } = {}) {
   let response;
 
+  // FormData carries a photo, and its Content-Type has to include the multipart
+  // boundary the browser generates. Setting the header by hand would omit that
+  // and the server would fail to parse a request that is otherwise perfectly
+  // formed, so it is left off deliberately.
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       method,
       signal,
       headers: {
-        ...(body !== undefined && { 'Content-Type': 'application/json' }),
+        ...(body !== undefined && !isFormData && { 'Content-Type': 'application/json' }),
         ...(token && { Authorization: `Bearer ${token}` }),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
     });
   } catch (err) {
     // A cancelled request is the caller superseding itself, not a failure —
@@ -81,16 +87,37 @@ function listQuery({ search, sort, page, limit, mealType, region, country, diet,
   return query ? `?${query}` : '';
 }
 
+/**
+ * A recipe write goes up as plain JSON, unless it carries a newly picked photo
+ * — then it becomes multipart: the photo as binary, and everything else as one
+ * JSON `payload` part.
+ *
+ * Splitting it that way rather than spreading the recipe across form fields
+ * keeps the nutrient rows and the tag lists as the arrays they are; multipart
+ * on its own would flatten every one of them to a string.
+ */
+function recipeBody(payload, photo) {
+  if (!photo) return payload;
+
+  const form = new FormData();
+  form.append('payload', JSON.stringify(payload));
+  // The filename is only a label — Cloudinary assigns its own id — but multer
+  // wants one, and the extension keeps the part's type honest.
+  form.append('image', photo, `photo.${(photo.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')}`);
+  return form;
+}
+
 export const recipeApi = {
-  create: (payload, token) => apiRequest('/recipe', { method: 'POST', body: payload, token }),
+  create: (payload, token, photo) =>
+    apiRequest('/recipe', { method: 'POST', body: recipeBody(payload, photo), token }),
 
   /**
    * Change a recipe you own. Only the keys sent are touched, so this backs both
    * the edit form — which sends the lot — and the visibility toggle, which
    * sends `{ isPublic }` on its own.
    */
-  update: (id, payload, token) =>
-    apiRequest(`/recipe/${id}`, { method: 'PUT', body: payload, token }),
+  update: (id, payload, token, photo) =>
+    apiRequest(`/recipe/${id}`, { method: 'PUT', body: recipeBody(payload, photo), token }),
 
   /** Delete a recipe you own, along with everyone's saves of it. */
   remove: (id, token) => apiRequest(`/recipe/${id}`, { method: 'DELETE', token }),

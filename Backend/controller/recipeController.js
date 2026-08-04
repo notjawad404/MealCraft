@@ -1,7 +1,13 @@
 const mongoose = require('mongoose');
 const Recipes = require('../model/recipeModel');
 const RecipeInteraction = require('../model/recipeInteractionModel');
-const { inspectImageDataUrl, MAX_THUMBNAIL_BYTES } = require('../utils/imageData');
+const { inspectImageBuffer } = require('../utils/imageData');
+const {
+    ImageStoreError,
+    isStoredImageUrl,
+    uploadImage,
+    destroyImage,
+} = require('../utils/imageStore');
 const { normalizeVideoUrl } = require('../utils/videoUrl');
 const {
     normalizeAllergens,
@@ -152,7 +158,7 @@ async function listRecipes(baseMatch, query) {
     }
 
     pipeline.push(
-        { $project: { image: 0, instructions: 0, nutrients: 0 } },
+        { $project: { image: 0, instructions: 0, nutrients: 0, imagePublicId: 0 } },
         { $sort: SORTS[sort] },
         {
             $facet: {
@@ -280,23 +286,86 @@ const getRecipe = async (req, res, next) => {
 };
 
 /**
- * Checks the two base64 fields on a write. Returns an error message, or null
- * when both are fine (or absent).
+ * Decides what `image`, `thumbnail` and `imagePublicId` should become for one
+ * write, uploading to Cloudinary when the request carries a new photo.
+ *
+ * A newly picked photo arrives as `file` — the binary multipart part, already
+ * downscaled and re-encoded by the browser. Everything else is expressed in
+ * `body.image`, which has three meanings:
+ *
+ *   absent      leave the recipe's photo exactly as it is
+ *   ''          the photo was removed
+ *   https://…   a URL this app wrote earlier, echoed back by the edit form
+ *
+ * `thumbnail` is never taken from the caller. It is a Cloudinary derivative of
+ * the image, so accepting one would only be a way to make the two disagree.
+ *
+ * @param {object} body
+ * @param {object|null} existing  the recipe as stored, on an edit
+ * @param {{ buffer: Buffer, mimetype: string }|undefined} file
+ * @returns {Promise<{ patch: object, uploaded: string|null, orphan: string|null } | { error: string, status?: number }>}
  */
-const checkImages = ({ image, thumbnail }) => {
-    if (image) {
-        const check = inspectImageDataUrl(image);
-        if (!check.ok) return check.message;
+async function resolveImage(body, existing = null, file = undefined) {
+    const nothingToDo = { patch: {}, uploaded: null, orphan: null };
+
+    // The asset the recipe holds now. Once the field points somewhere else it
+    // has nobody left to reference it, so it gets swept up after the write.
+    const previous = existing?.imagePublicId || null;
+
+    if (file) {
+        // Type, size and leading bytes are settled here, before the bytes are
+        // handed to anyone else. Cloudinary is never asked to arbitrate what
+        // counts as an image, and a bad upload costs no bandwidth to reject.
+        const check = inspectImageBuffer(file.buffer, file.mimetype);
+        if (!check.ok) return { error: check.message };
+
+        try {
+            const stored = await uploadImage(file.buffer);
+            return {
+                patch: { image: stored.image, thumbnail: stored.thumbnail, imagePublicId: stored.publicId },
+                uploaded: stored.publicId,
+                orphan: previous,
+            };
+        } catch (err) {
+            if (err instanceof ImageStoreError) return { error: err.message, status: 502 };
+            throw err;
+        }
     }
-    if (thumbnail) {
-        const check = inspectImageDataUrl(thumbnail, {
-            maxBytes: MAX_THUMBNAIL_BYTES,
-            label: 'Thumbnail',
-        });
-        if (!check.ok) return check.message;
+
+    if (body.image === undefined) return nothingToDo;
+
+    if (!body.image) {
+        // Already empty: say so rather than issuing a pointless $set.
+        if (existing && !existing.image) return nothingToDo;
+        return {
+            patch: { image: '', thumbnail: '', imagePublicId: '' },
+            uploaded: null,
+            orphan: previous,
+        };
     }
-    return null;
-};
+
+    // The overwhelmingly common case: an edit that did not touch the photo.
+    // Returning an empty patch keeps the derived thumbnail and the public id
+    // in place, which re-sending the URL on its own could not. Tested before
+    // the ownership check so that changing or dropping the credentials later
+    // cannot make an existing recipe uneditable.
+    if (existing && body.image === existing.image) return nothingToDo;
+
+    if (isStoredImageUrl(body.image)) {
+        // A URL on our cloud that this recipe was not already using. It is
+        // safe to point at, but the asset belongs to some other document, so
+        // no public id is recorded — this recipe must never be able to delete
+        // a photo it does not own.
+        const thumbnail = isStoredImageUrl(body.thumbnail) ? body.thumbnail : body.image;
+        return {
+            patch: { image: body.image, thumbnail, imagePublicId: '' },
+            uploaded: null,
+            orphan: previous,
+        };
+    }
+
+    return { error: 'A photo has to be uploaded as a file, not sent as a link.' };
+}
 
 // Every optional field, paired with the function that vets it. Each normalizer
 // answers `{ ok: true, <key>: value }` or `{ ok: false, message }`, so the loop
@@ -351,8 +420,11 @@ const readOptionalFields = (body) => {
 
 // Add a new recipe
 const addRecipe = async (req, res, next) => {
+    // Tracked outside the try so a failure *after* the upload can clean up the
+    // asset it left behind on Cloudinary.
+    let uploaded = null;
     try {
-        const { image, thumbnail, isPublic } = req.body;
+        const { isPublic } = req.body;
         const title = text(req.body.title);
         const ingredients = text(req.body.ingredients);
         const instructions = text(req.body.instructions);
@@ -369,13 +441,6 @@ const addRecipe = async (req, res, next) => {
             return res.status(400).json({ message: `Time must be whole minutes between 1 and ${MAX_MINUTES}.` });
         }
 
-        // The images are base64 data URIs that get stored on the document, so
-        // they are vetted before they can bloat the collection.
-        const imageError = checkImages(req.body);
-        if (imageError) {
-            return res.status(400).json({ message: imageError });
-        }
-
         const optional = readOptionalFields(req.body);
         if (optional.error) {
             return res.status(400).json({ message: optional.error });
@@ -386,13 +451,21 @@ const addRecipe = async (req, res, next) => {
             return res.status(400).json({ message: conflict });
         }
 
+        // Last, because it is the only step that leaves the machine: every
+        // cheap reason to reject this request has already been ruled out, so
+        // nothing is uploaded for a recipe that was about to be refused.
+        const photo = await resolveImage(req.body, null, req.file);
+        if (photo.error) {
+            return res.status(photo.status || 400).json({ message: photo.error });
+        }
+        uploaded = photo.uploaded;
+
         const recipe = await Recipes.create({
             title,
             ingredients,
             instructions,
             time,
-            image: image || undefined,
-            thumbnail: thumbnail || undefined,
+            ...photo.patch,
             ...optional.patch,
             username,
             createdBy: req.user.userId,
@@ -401,12 +474,16 @@ const addRecipe = async (req, res, next) => {
 
         return res.status(201).json(recipe);
     } catch (err) {
+        // The recipe was never written, so an uploaded photo now belongs to
+        // nothing. Best effort — the original error is what matters here.
+        await destroyImage(uploaded);
         next(err);
     }
 };
 
 // Edit a recipe
 const editRecipe = async (req, res, next) => {
+    let uploaded = null;
     try {
         const recipe = await Recipes.findById(req.params.id);
         if (!recipe) {
@@ -417,7 +494,7 @@ const editRecipe = async (req, res, next) => {
             return res.status(403).json({ message: 'Not authorized to edit this recipe' });
         }
 
-        const { title, ingredients, instructions, time, image, thumbnail, isPublic } = req.body;
+        const { title, ingredients, instructions, time, isPublic } = req.body;
 
         // An edit sends only what it means to change, so an absent field is
         // left alone — but one that arrives blank would wipe a column the
@@ -430,11 +507,6 @@ const editRecipe = async (req, res, next) => {
 
         if (time !== undefined && parseMinutes(text(time)) === null) {
             return res.status(400).json({ message: `Time must be whole minutes between 1 and ${MAX_MINUTES}.` });
-        }
-
-        const imageError = checkImages(req.body);
-        if (imageError) {
-            return res.status(400).json({ message: imageError });
         }
 
         const optional = readOptionalFields(req.body);
@@ -452,12 +524,25 @@ const editRecipe = async (req, res, next) => {
             return res.status(400).json({ message: conflict });
         }
 
-        const patch = { title, ingredients, instructions, time, image, thumbnail, ...optional.patch };
+        const photo = await resolveImage(req.body, recipe, req.file);
+        if (photo.error) {
+            return res.status(photo.status || 400).json({ message: photo.error });
+        }
+        uploaded = photo.uploaded;
+
+        const patch = { title, ingredients, instructions, time, ...photo.patch, ...optional.patch };
         if (isPublic !== undefined) patch.isPublic = Boolean(isPublic);
         const updated = await Recipes.findByIdAndUpdate(req.params.id, patch, { new: true });
 
+        // Only now that the document points somewhere else is the photo it used
+        // to point at safe to remove. Awaited rather than left running: on a
+        // serverless host the process can be frozen the moment the response
+        // goes out, and a detached promise would simply never finish.
+        if (photo.orphan) await destroyImage(photo.orphan);
+
         return res.json(updated);
     } catch (err) {
+        await destroyImage(uploaded);
         next(err);
     }
 };
@@ -478,6 +563,9 @@ const deleteRecipe = async (req, res, next) => {
         // Otherwise every user who saved it keeps a row pointing at nothing,
         // and their favourites page quietly comes up one short.
         await RecipeInteraction.deleteMany({ recipe: recipe._id });
+        // And the photo would sit in Cloudinary forever, billed for, with the
+        // only record of its existence now deleted.
+        await destroyImage(recipe.imagePublicId);
 
         return res.json({ message: 'Recipe deleted' });
     } catch (err) {
