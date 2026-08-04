@@ -1,20 +1,5 @@
 /*
- * Fifty recipes for a development database.
- *
- * Written to exercise every optional field rather than to look tidy: some
- * recipes carry a full nutrient table and some carry none, some have a calorie
- * figure and some leave it unknown, allergen lists run from empty to six
- * entries, and a few use the free-text allergen slot the picker offers. That
- * spread is the point — a seed where every record is complete tells you nothing
- * about how the app looks when a cook only filled in half the form.
- *
- * No images. They are meant to be added once there is somewhere to put them.
- *
- * The video links are real, and the seeder checks every one of them against
- * YouTube before writing: anything that no longer resolves is dropped and the
- * recipe is stored without a video. A link that looks right and plays nothing
- * is worse than no link, and inventing plausible-looking video ids is the
- * easiest way to produce exactly that.
+ * Fifty recipes for a development database. See docs/OPERATIONS.md.
  *
  * `time` is in minutes; everything nutritional is per serving.
  */

@@ -6,12 +6,7 @@ import { splitLines } from '../lib/recipes';
 import FormAlert from './common/FormAlert';
 import RecipeForm from './recipe/RecipeForm';
 
-/**
- * The stored record, in the shape the form's fields expect: ingredients back to
- * one line each, and the optional numbers back to empty boxes rather than the
- * nulls the API answers with — React reads a null value as "uncontrolled" and
- * complains the moment the box is typed in.
- */
+/** The stored record, in the shape the form's fields expect. */
 function toFormValues(recipe) {
   const ingredients = splitLines(recipe.ingredients);
 
@@ -57,7 +52,7 @@ export default function EditRecipe() {
     const controller = new AbortController();
 
     setState({ recipe: null, error: '', pending: true });
-    // The token matters here: a private recipe is not found without it.
+    // The token is required, or a private recipe 404s.
     recipeApi
       .get(id, { token, signal: controller.signal })
       .then((recipe) => setState({ recipe, error: '', pending: false }))
@@ -71,14 +66,11 @@ export default function EditRecipe() {
 
   const { recipe, error, pending } = state;
 
-  // `createdBy` comes back populated with the author's name, so the id is a
-  // step down. The API refuses this too — this only saves the round trip and
-  // says something clearer than "403".
+  // Also enforced by the API; this only saves the round trip.
   const ownerId = recipe?.createdBy?._id ?? recipe?.createdBy;
   const isOwner = Boolean(ownerId) && String(ownerId) === String(user?.id);
 
-  // Thrown errors are left for RecipeForm's banner, so a rejected save keeps
-  // everything that was typed.
+  // Thrown errors are left for RecipeForm's banner.
   const handleSubmit = async (payload, photo) => {
     await recipeApi.update(id, payload, token, photo);
     navigate('/my-recipes');

@@ -4,12 +4,8 @@ import Navbar from './Navbar';
 import Footer from './Footer';
 
 /**
- * A new page starts at the top. Without this, opening a recipe from halfway
- * down a listing opens it halfway down.
- *
- * Keyed on the path alone, so the listings — which keep their search, sort and
- * page in the query string — are left to their own scrolling. Back and forward
- * are left alone too: the browser has already restored where the reader was.
+ * Scrolls a new page to the top. Keyed on the path alone, so query-string
+ * changes and history navigation keep their own scroll position.
  */
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -17,7 +13,6 @@ function ScrollToTop() {
 
   useEffect(() => {
     if (navigationType === 'POP') return;
-    // Not smooth: the page being scrolled is the one being left.
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [pathname, navigationType]);
 

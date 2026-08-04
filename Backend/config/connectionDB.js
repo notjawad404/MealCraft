@@ -25,10 +25,8 @@ const diagnose = (err) => {
     return '';
 };
 
-// A warm serverless instance handles many requests, and each one calls
-// connectDB(). Caching the promise on the module keeps that to one connection
-// per instance instead of one per request, which would exhaust the Atlas
-// connection limit. Cleared on failure so the next request can retry.
+// Cached so a warm instance opens one connection, not one per request.
+// Cleared on failure so the next request can retry.
 let connection = null;
 
 const connectDB = async () => {

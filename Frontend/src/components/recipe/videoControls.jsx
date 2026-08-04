@@ -1,8 +1,6 @@
-/** The icon set and button shell shared by the player and its control bar. */
+/** The icon set and button shell shared by the players. */
 
-// Drawn to match the rest of the app: 24-unit box, stroked, round joins. The
-// two transport glyphs are filled instead — a hairline play triangle reads as
-// decoration rather than as the thing you press.
+// 24-unit box, stroked, round joins; the transport glyphs are filled.
 const ICONS = {
   play: <path d="M8 5.1v13.8L19 12z" fill="currentColor" stroke="none" />,
   pause: <path d="M9.5 5.5v13M14.5 5.5v13" strokeWidth="2.6" />,
@@ -52,10 +50,7 @@ export function Icon({ name, className = 'h-5 w-5' }) {
   );
 }
 
-/**
- * A control-bar button. `label` is both the accessible name and the tooltip —
- * these are icons over video, so there is nowhere to put visible text.
- */
+/** A control-bar button. `label` is both the accessible name and the tooltip. */
 export function ControlButton({ label, icon, onClick, pressed, children, className = '' }) {
   return (
     <button

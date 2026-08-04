@@ -1,13 +1,6 @@
 /**
- * Recognising and embedding recipe video links.
- *
- * Mirrors Backend/utils/videoUrl.js, which is what actually decides whether a
- * link is stored — this copy exists so the form can reject a bad paste without
- * a round trip, and so the player knows which kind of thing it is holding.
- * Add a provider in one and it has to be added in the other.
- *
- * YouTube is the preferred source: its player brings quality, captions and
- * playback speed with it. The rest are accepted and play.
+ * Recognising and embedding recipe video links. Mirrors the API's own parser;
+ * see docs/FRONTEND.md.
  */
 
 export const VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.webm', '.ogv', '.mov'];
@@ -109,23 +102,18 @@ export function parseVideoUrl(value) {
   else if (VIMEO_HOSTS.has(host)) parsed = readVimeo(url, segments);
   else if (DAILYMOTION_HOSTS.has(host)) parsed = readDailymotion(url, segments);
   else if (VIDEO_EXTENSIONS.some((suffix) => url.pathname.toLowerCase().endsWith(suffix))) {
-    // Served over https, so an http file would be blocked as mixed content.
+    // An http file would be blocked as mixed content.
     parsed = url.protocol === 'https:' ? { provider: 'file', id: '', hash: '', start: 0 } : null;
   }
 
   return parsed && { ...parsed, url: url.toString() };
 }
 
-/**
- * The src for the provider's own player. Autoplay is on because this is only
- * ever reached by someone pressing Watch; the browser may still decline, in
- * which case the player shows its own play button and nothing is lost.
- */
+/** The src for the provider's own player. */
 export function embedSrc(parsed) {
   const { provider, id, hash, start } = parsed;
 
   if (provider === 'youtube') {
-    // nocookie is the same player without the tracking cookies.
     const params = new URLSearchParams({ autoplay: '1', rel: '0', playsinline: '1' });
     if (start) params.set('start', String(start));
     return `https://www.youtube-nocookie.com/embed/${id}?${params}`;
@@ -144,7 +132,7 @@ export function embedSrc(parsed) {
   return null;
 }
 
-/** 372 → "6:12". Hours only appear once there are any. */
+/** 372 → "6:12". */
 export function formatClock(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
 

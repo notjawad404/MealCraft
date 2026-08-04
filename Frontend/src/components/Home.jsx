@@ -47,7 +47,7 @@ const steps = [
 export default function Home() {
   return (
     <>
-      {/* ───────────────────────── Hero ───────────────────────── */}
+      {/* Hero */}
       <section className="relative overflow-hidden border-b border-ink-200 dark:border-night-700">
         <div className="grain" aria-hidden="true" />
         <div
@@ -109,7 +109,7 @@ export default function Home() {
             </dl>
           </div>
 
-          {/* Recipe cards, composed from markup — the app ships no images. */}
+          {/* Decorative recipe cards, composed from markup. */}
           <div className="relative mx-auto w-full max-w-sm animate-fade-in lg:mx-0 lg:ml-auto">
             {/* Back card */}
             <div className="absolute -left-6 top-8 hidden w-full rotate-[-6deg] rounded-[1.75rem] border border-ink-200 bg-paper-100 p-6 shadow-card dark:border-night-600 dark:bg-night-700 sm:block">
@@ -161,7 +161,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ──────────────── Category band ──────────────── */}
+      {/* Category band */}
       <section className="border-b border-ink-200 bg-paper-100 dark:border-night-700 dark:bg-night-800">
         <div className="shell flex flex-wrap items-center justify-center gap-x-8 gap-y-3 py-6">
           {categories.map((c) => (
@@ -175,7 +175,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ──────────────── Principles ──────────────── */}
+      {/* Principles */}
       <section className="shell py-24">
         <div className="max-w-2xl">
           <p className="eyebrow">Why it feels different</p>
@@ -201,7 +201,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ──────────────── How it works ──────────────── */}
+      {/* How it works */}
       <section
         id="how-it-works"
         className="scroll-mt-24 border-y border-ink-200 bg-paper-100 dark:border-night-700 dark:bg-night-800"
@@ -235,7 +235,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ──────────────── Closing CTA ──────────────── */}
+      {/* Closing CTA */}
       <section className="shell py-24">
         <div className="relative overflow-hidden rounded-[2rem] bg-ink-900 px-8 py-20 text-center dark:bg-night-800 sm:px-16">
           <div className="grain" aria-hidden="true" />

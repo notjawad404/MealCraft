@@ -1,14 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import useDebouncedValue from '../../hooks/useDebouncedValue';
 
-// Shorter than the list's own debounce — the dropdown should feel like it is
-// keeping up with typing, and the request behind it is five titles.
+// Shorter than the list's own debounce.
 const SUGGEST_DELAY = 180;
 const MIN_CHARS = 2;
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Splits a title around the typed term so the match can be picked out. */
+/** Splits a title around the typed term, for highlighting. */
 function highlight(title, term) {
   if (!term) return [title];
   const parts = title.split(new RegExp(`(${escapeRegex(term)})`, 'i'));
@@ -16,10 +15,8 @@ function highlight(title, term) {
 }
 
 /**
- * Search input with a type-ahead list of up to five matching recipe titles.
- * Behaves as a combobox: arrows move, Enter picks, Escape dismisses.
- *
- * `fetchSuggestions` is optional — without it this is a plain search box.
+ * Search input with a type-ahead list of matching titles. Behaves as a
+ * combobox. Without `fetchSuggestions` it is a plain search box.
  */
 export default function SearchBox({ value, onChange, placeholder, fetchSuggestions }) {
   const inputId = useId();
@@ -46,8 +43,7 @@ export default function SearchBox({ value, onChange, placeholder, fetchSuggestio
         setItems(data?.suggestions ?? []);
         setActive(-1);
       })
-      // A failing type-ahead is not worth an error message; the list below
-      // still reports anything that actually matters.
+      // A failing type-ahead is silent; the list below reports real errors.
       .catch(() => {
         if (!controller.signal.aborted) setItems([]);
       });
@@ -145,7 +141,7 @@ export default function SearchBox({ value, onChange, placeholder, fetchSuggestio
           id={listId}
           role="listbox"
           aria-label="Matching recipes"
-          // Keeps the input focused so the click lands before blur closes this.
+          // Keeps focus, so the click lands before blur closes the list.
           onMouseDown={(e) => e.preventDefault()}
           className="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border
                      border-ink-200 bg-white py-1.5 shadow-lift

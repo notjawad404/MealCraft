@@ -3,8 +3,7 @@ const Recipes = require('../model/recipeModel');
 const RecipeInteraction = require('../model/recipeInteractionModel');
 const { listRecipes } = require('./recipeController');
 
-// Liking and favouriting are the same shape twice over, so they are described
-// once and the handlers are built from the description.
+// Both interactions share one shape; the handlers are built from this.
 const KINDS = {
     like: { flag: 'liked', at: 'likedAt', counter: 'likeCount' },
     favourite: { flag: 'favourited', at: 'favouritedAt', counter: 'favouriteCount' },
@@ -12,11 +11,7 @@ const KINDS = {
 
 const DUPLICATE_KEY = 11000;
 
-/**
- * The recipe, if this user is allowed to touch it at all. A private recipe
- * belonging to someone else is not merely unlikeable — it is not theirs to know
- * about, so this reports it missing rather than forbidden.
- */
+/** The recipe, or null if this user may not see it. */
 async function findVisibleRecipe(recipeId, userId) {
     if (!mongoose.isValidObjectId(recipeId)) return null;
 
@@ -28,12 +23,9 @@ async function findVisibleRecipe(recipeId, userId) {
 }
 
 /**
- * Set one flag on this user's row for this recipe, creating the row if this is
- * the first thing they have ever done about it.
+ * Set one flag on this user's row, creating the row if needed.
  *
- * Returns whether the flag actually moved. Setting a flag that is already set
- * is not an error — a double-tapped heart, or a retried request, has to end in
- * the same place as a single one — but it must not be counted twice.
+ * @returns {Promise<boolean>} whether the flag actually moved
  */
 async function applyFlag({ user, recipe, kind, on, retry = true }) {
     const { flag, at } = KINDS[kind];
@@ -45,13 +37,10 @@ async function applyFlag({ user, recipe, kind, on, retry = true }) {
             { upsert: true, new: false, setDefaultsOnInsert: true },
         );
 
-        // `previous` is null when this call created the row, and a row that did
-        // not exist cannot have had the flag set.
+        // `previous` is null when this call created the row.
         return Boolean(previous?.[flag]) !== on;
     } catch (err) {
-        // Two of this user's requests raced and both tried to insert. The
-        // unique index refused the second; by now the row exists, so the same
-        // update run again is an ordinary update and settles it.
+        // Two requests raced to insert; by now the row exists, so retry once.
         if (err?.code === DUPLICATE_KEY && retry) {
             return applyFlag({ user, recipe, kind, on, retry: false });
         }
@@ -59,14 +48,7 @@ async function applyFlag({ user, recipe, kind, on, retry = true }) {
     }
 }
 
-/**
- * PUT/DELETE /recipe/:id/like and /recipe/:id/favourite.
- *
- * Deliberately not one toggle endpoint: a toggle asks the server to work out
- * what the client meant, which two taps in flight at once make unanswerable.
- * "Set it on" and "set it off" both land in a known state however many times
- * they arrive.
- */
+/** PUT/DELETE /recipe/:id/like and /recipe/:id/favourite. Idempotent. */
 const setFlag = (kind, on) => async (req, res, next) => {
     try {
         if (!mongoose.isValidObjectId(req.user.userId)) {
@@ -85,9 +67,7 @@ const setFlag = (kind, on) => async (req, res, next) => {
 
         let count = recipe[counter] ?? 0;
         if (changed) {
-            // $inc rather than a recount: the whole point of the stored total is
-            // that nobody has to count. The guard on the way down stops a
-            // counter that has drifted from going negative and staying there.
+            // The filter on the way down keeps a drifted counter off negatives.
             const filter = on ? { _id: recipe._id } : { _id: recipe._id, [counter]: { $gt: 0 } };
             const updated = await Recipes.findOneAndUpdate(
                 filter,
@@ -115,14 +95,7 @@ async function flaggedRecipeIds(user, kind) {
     return rows.map((row) => row.recipe);
 }
 
-/**
- * The listing behind a future "my favourites" or "my likes" page. Paging,
- * search and sorting come from the same helper the other listings use, so those
- * pages will behave identically to the ones that already exist.
- *
- * A recipe made private after being saved drops out unless the reader owns it —
- * saving something is not a permanent claim on it.
- */
+/** The listing behind a "my favourites" or "my likes" page. */
 const listFlagged = (kind) => async (req, res, next) => {
     try {
         if (!mongoose.isValidObjectId(req.user.userId)) {
@@ -143,13 +116,7 @@ const listFlagged = (kind) => async (req, res, next) => {
     }
 };
 
-/**
- * GET /recipe/saved/ids — every recipe this user has liked or favourited, as
- * two flat lists.
- *
- * This is what lets a heart render filled on any page without asking per card:
- * one small call on load, and the listing pages stay unauthenticated.
- */
+/** GET /recipe/saved/ids — this user's liked and favourited ids. */
 const getSavedIds = async (req, res, next) => {
     try {
         if (!mongoose.isValidObjectId(req.user.userId)) {

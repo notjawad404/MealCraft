@@ -1,9 +1,6 @@
 const GAP = 'gap';
 
-/**
- * First, last and the pages either side of the current one, with gaps collapsed
- * to an ellipsis: 1 … 4 5 6 … 20.
- */
+/** First, last and the pages around the current one: 1 … 4 5 6 … 20. */
 function pageItems(page, pages) {
   const wanted = [1, pages, page - 1, page, page + 1]
     .filter((n) => n >= 1 && n <= pages)

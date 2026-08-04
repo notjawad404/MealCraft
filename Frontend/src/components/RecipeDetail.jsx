@@ -53,13 +53,7 @@ function Loading() {
   );
 }
 
-/**
- * One recipe, in full, on a page of its own.
- *
- * A page rather than a dialog because a recipe is a destination: it can be
- * linked to, kept open in a tab, and read on a phone without a scroll trap
- * between the cook and the method.
- */
+/** One recipe, in full, on a page of its own. */
 export default function RecipeDetail() {
   const { id } = useParams();
   const location = useLocation();
@@ -73,8 +67,7 @@ export default function RecipeDetail() {
     const controller = new AbortController();
 
     setState({ recipe: null, error: '', pending: true });
-    // Sent whenever there is one: a private recipe is not found without it,
-    // even by the person who wrote it.
+    // The token is sent when there is one, or a private recipe 404s.
     recipeApi
       .get(id, { token, signal: controller.signal })
       .then((recipe) => setState({ recipe, error: '', pending: false }))
@@ -88,12 +81,8 @@ export default function RecipeDetail() {
 
   const { recipe, error, pending } = state;
 
-  // The card that was clicked leaves its own address behind. Going back is a
-  // real step back through history rather than a link to the same URL: that is
-  // what returns the reader to the search, the filters, the page *and* the
-  // scroll position they left — a link would push a third entry and land them
-  // at the top of the list. Opened in a fresh tab there is no history to step
-  // through, and no state either, so that case gets a plain link out.
+  // A history step rather than a link, so the listing's scroll is restored.
+  // Without `from` — a fresh tab — there is no history to step through.
   const from = location.state?.from;
   const backLabel = String(from).startsWith('/my-recipes') ? 'Back to your recipes' : 'Back to recipes';
 
@@ -132,9 +121,6 @@ export default function RecipeDetail() {
                 That recipe is not here
               </h1>
               <p className="mt-4 text-[15px] leading-relaxed text-ink-600 dark:text-ink-300">
-                {/* A private recipe answers the same way to anyone but its
-                    author, so this covers deleted, mistyped and not-yours
-                    alike — deliberately. */}
                 {error || 'It may have been deleted, or the link may be wrong.'}
               </p>
               <Link to="/recipes" className="btn-primary mt-8">
@@ -175,8 +161,7 @@ export default function RecipeDetail() {
 
               <div className="mt-10 space-y-8">
                 {recipe.videoUrl ? (
-                  // Theatre mode widens the video out to the shell around it
-                  // and leaves the reading column where it is.
+                  // Theatre mode widens only the video, not the reading column.
                   <div
                     className={`mx-auto transition-[max-width] duration-300 ${
                       theater ? 'max-w-6xl' : 'max-w-4xl'
@@ -231,10 +216,7 @@ export default function RecipeDetail() {
 
                 <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                   <div className="space-y-8">
-                    {/* A recipe with a video gives the hero slot to the player,
-                        which used to mean its photo was never shown at all.
-                        It sits beside the ingredients instead: still on the
-                        page, without pushing the method further down. */}
+                    {/* With a video in the hero slot, the photo sits here. */}
                     {recipe.videoUrl && image && (
                       <figure>
                         <img

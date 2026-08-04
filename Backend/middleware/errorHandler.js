@@ -1,8 +1,5 @@
 module.exports = function errorHandler(err, req, res, next) {
-    // body-parser rejects oversized bodies before any route runs. Its own
-    // message ("request entity too large") tells the user nothing they can act
-    // on, and in practice this only ever fires on an image that slipped past
-    // the client-side downscaling.
+    // body-parser rejects oversized bodies before any route runs.
     if (err.type === 'entity.too.large') {
         return res.status(413).json({
             success: false,

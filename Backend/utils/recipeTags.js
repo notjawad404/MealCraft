@@ -1,15 +1,6 @@
-// The allergen and dietary vocabulary. Both lists are stored as the slugs
-// below rather than as the words shown on screen, so the wording can change
-// without a migration and so a future "hide anything with dairy in it" filter
-// has something exact to match on.
-//
-// Frontend/src/lib/recipes.js mirrors both lists for the picker on the recipe
-// form. The two have to be kept in step — the slugs here are what the API
-// accepts, the labels there are only how they are worded.
+// Recipe tag vocabularies. See docs/BACKEND.md.
 
-// The fourteen allergens that have to be declared on food sold in the UK and
-// EU. Anything outside this set is kept as free text, because the cook is the
-// only one who knows their recipe contains, say, cinnamon.
+// The fourteen declarable allergens. Free text is accepted alongside these.
 const ALLERGENS = [
     'peanuts',
     'tree-nuts',
@@ -27,9 +18,7 @@ const ALLERGENS = [
     'sulphites',
 ];
 
-// Diets a recipe can be marked as suitable for. Unlike allergens this list is
-// closed: "suitable for X" is a claim someone with a restriction acts on, and
-// a free-text version of it would be unmatchable and unverifiable.
+// Diets a recipe can be marked suitable for. Closed vocabulary.
 const DIETS = [
     'halal',
     'kosher',
@@ -46,11 +35,7 @@ const DIETS = [
     'paleo',
 ];
 
-// Allergens each diet rules out. A recipe cannot both declare an allergen and
-// claim a diet that excludes it — someone avoiding nuts reads the badge, not
-// the ingredients, and the two disagreeing is the failure that matters here.
-// Diets absent from this map (halal, kosher, keto…) constrain ingredients the
-// allergen list has nothing to say about.
+// Allergens each diet rules out.
 const DIET_EXCLUDES = {
     vegan: ['dairy', 'eggs', 'fish', 'shellfish', 'molluscs'],
     vegetarian: ['fish', 'shellfish', 'molluscs'],
@@ -60,8 +45,7 @@ const DIET_EXCLUDES = {
     'egg-free': ['eggs'],
 };
 
-// When in the day the recipe is for. A recipe can be several of these at once —
-// a frittata is breakfast, brunch and lunch.
+// When in the day the recipe is for. A recipe can be several at once.
 const MEAL_TYPES = [
     'breakfast',
     'brunch',
@@ -74,10 +58,7 @@ const MEAL_TYPES = [
     'drink',
 ];
 
-// Culinary regions, which are the level most cooking actually belongs to —
-// "Levantine" says more about a dish than the country it was cooked in. The
-// country list beside it is free text, because there is no version of a fixed
-// country list that is not an argument.
+// Culinary regions. Countries beside these are free text.
 const REGIONS = [
     'north-african',
     'west-african',
@@ -106,9 +87,7 @@ const MAX_REGIONS = 6;
 const MAX_COUNTRIES = 6;
 const MAX_COUNTRY_LENGTH = 60;
 
-// Free text has to start with a letter or digit and then stay in ordinary
-// punctuation — enough for "blue cheese", "MSG", "shea (nut) butter" or
-// "Côte d'Ivoire", nothing like a pasted URL.
+// Free text: opens with a letter or digit, then ordinary punctuation only.
 const PLAIN_WORDS = /^[\p{L}\p{N}][\p{L}\p{N} '&(),./-]*$/u;
 
 const reject = (message) => ({ ok: false, message });
@@ -118,11 +97,7 @@ const DIET_SET = new Set(DIETS);
 const MEAL_TYPE_SET = new Set(MEAL_TYPES);
 const REGION_SET = new Set(REGIONS);
 
-/**
- * Trim, lower-case and de-duplicate a list of tags. Values are lower-cased so
- * a custom "Blue Cheese" and "blue cheese" are one allergen rather than two;
- * the frontend capitalises them for display.
- */
+/** Trim, lower-case and de-duplicate a list of tags. */
 function cleanList(value, { field, preserveCase = false }) {
     if (value === null) return { ok: true, list: [] };
     if (!Array.isArray(value)) {
@@ -136,14 +111,10 @@ function cleanList(value, { field, preserveCase = false }) {
         if (typeof entry !== 'string') {
             return reject(`Every entry in ${field.toLowerCase()} must be text.`);
         }
-        // Internal runs of whitespace are collapsed too, so "tree  nuts" does
-        // not survive as a separate tag from "tree nuts".
         const cleaned = entry.trim().replace(/\s+/g, ' ');
         const key = cleaned.toLowerCase();
         if (!cleaned || seen.has(key)) continue;
         seen.add(key);
-        // Proper nouns keep their capitals; everything else is lower-cased so
-        // "Dairy" and "dairy" cannot both exist.
         list.push(preserveCase ? cleaned : key);
     }
 
@@ -151,8 +122,7 @@ function cleanList(value, { field, preserveCase = false }) {
 }
 
 /**
- * Validate the allergens on a recipe. Known slugs pass through; anything else
- * is kept as the cook's own free text.
+ * Validate a recipe's allergens. Unknown values are kept as free text.
  *
  * @returns {{ ok: true, allergens: string[] } | { ok: false, message: string }}
  */
@@ -204,7 +174,7 @@ function normalizeChoices(value, { allowed, field, max, plural, singular }) {
     return cleaned;
 }
 
-/** Breakfast, lunch, dinner and the rest. Closed vocabulary. */
+/** Meal types. Closed vocabulary. */
 function normalizeMealTypes(value) {
     const result = normalizeChoices(value, {
         allowed: MEAL_TYPE_SET,
@@ -216,7 +186,7 @@ function normalizeMealTypes(value) {
     return result.ok ? { ok: true, mealTypes: result.list } : result;
 }
 
-/** Culinary regions. Closed vocabulary; countries beside it are not. */
+/** Culinary regions. Closed vocabulary. */
 function normalizeRegions(value) {
     const result = normalizeChoices(value, {
         allowed: REGION_SET,
@@ -228,12 +198,7 @@ function normalizeRegions(value) {
     return result.ok ? { ok: true, regions: result.list } : result;
 }
 
-/**
- * Countries the recipe belongs to. Free text — a fixed list would have to take
- * a position on which places are countries, which is not this app's argument to
- * have. Capitalisation is left as typed, these being proper nouns; "Côte
- * d'Ivoire" is not something to be reassembled from a lower-cased copy.
- */
+/** Countries the recipe belongs to. Free text, capitalisation preserved. */
 function normalizeCountries(value) {
     if (value === undefined) return { ok: true, countries: [] };
 
@@ -257,7 +222,7 @@ function normalizeCountries(value) {
 }
 
 /**
- * Validate the diets a recipe is marked suitable for. Closed vocabulary.
+ * Validate a recipe's diets. Closed vocabulary.
  *
  * @returns {{ ok: true, diets: string[] } | { ok: false, message: string }}
  */
@@ -276,10 +241,7 @@ function normalizeDiets(value) {
     return { ok: true, diets: cleaned.list };
 }
 
-/**
- * The first diet/allergen contradiction, worded for the person who wrote it,
- * or null when the two lists agree.
- */
+/** The first diet/allergen contradiction, or null. */
 function findDietConflict(diets = [], allergens = []) {
     const declared = new Set(allergens);
 

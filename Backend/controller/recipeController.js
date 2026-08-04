@@ -23,11 +23,9 @@ const text = (value) => (typeof value === 'string' ? value.trim() : '');
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
-const MAX_MINUTES = 2880; // two days, which covers proving, curing and brining
+const MAX_MINUTES = 2880;
 
-// `time` is a string on the schema, so it is converted for sorting. Anything
-// that will not convert is parked at the end of the ascending order rather than
-// the front, which is what someone scanning for "quickest" actually wants.
+// Unparsable times sort last.
 const UNSORTABLE_TIME = 10 ** 7;
 
 const SORTS = {
@@ -42,7 +40,7 @@ const DEFAULT_SORT = 'newest';
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Positive whole minutes, or null if the value is not usable. */
+/** Positive whole minutes, or null. */
 const parseMinutes = (value) => {
     if (!/^\d+$/.test(value)) return null;
     const minutes = Number(value);
@@ -71,7 +69,7 @@ const parseStringArrayParam = (val) => {
     return [];
 };
 
-/** Query-string params are user input; every one of them is clamped here. */
+/** Clamps every list query param. */
 const parseListQuery = (query) => {
     const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
     const limit = Math.min(MAX_LIMIT, Math.max(1, Number.parseInt(query.limit, 10) || DEFAULT_LIMIT));
@@ -93,10 +91,7 @@ const parseListQuery = (query) => {
     return { page, limit, sort, search, mealTypes, regions, countries, diets, exclude, maxCalories, maxTime };
 };
 
-/**
- * Shared paging/searching/sorting for the two listing endpoints. `baseMatch`
- * decides *which* recipes are in scope — public ones, or one user's own.
- */
+/** Shared paging, searching and sorting for the listing endpoints. */
 async function listRecipes(baseMatch, query) {
     const { page, limit, sort, search, mealTypes, regions, countries, diets, exclude, maxCalories, maxTime } = parseListQuery(query);
 
@@ -189,11 +184,7 @@ async function listRecipes(baseMatch, query) {
 
 const SUGGESTION_LIMIT = 5;
 
-/**
- * Titles only, for the search box's type-ahead. Deliberately narrower than the
- * listing search, which also looks inside ingredients: a dropdown of titles
- * that do not visibly contain what you typed reads as broken.
- */
+/** Matching titles for the search box type-ahead. */
 async function suggestTitles(baseMatch, query) {
     const search = text(query.search).slice(0, 100);
     if (!search) return [];
@@ -201,12 +192,12 @@ async function suggestTitles(baseMatch, query) {
     return Recipes.find({ ...baseMatch, title: new RegExp(escapeRegex(search), 'i') })
         .select('title')
         .sort({ title: 1 })
-        .collation({ locale: 'en', strength: 2 }) // so "apple" is not exiled below "Zabaglione"
+        .collation({ locale: 'en', strength: 2 })
         .limit(SUGGESTION_LIMIT)
         .lean();
 }
 
-// Title suggestions across public recipes
+// Title suggestions across public recipes.
 const suggestRecipes = async (req, res, next) => {
     try {
         return res.json({ suggestions: await suggestTitles({ isPublic: true }, req.query) });
@@ -215,7 +206,7 @@ const suggestRecipes = async (req, res, next) => {
     }
 };
 
-// Title suggestions across the logged-in user's own recipes
+// Title suggestions across the logged-in user's own recipes.
 const suggestMyRecipes = async (req, res, next) => {
     try {
         if (!mongoose.isValidObjectId(req.user.userId)) {
@@ -229,7 +220,7 @@ const suggestMyRecipes = async (req, res, next) => {
     }
 };
 
-// Get public recipes — paged, searchable, sortable
+// Public recipes: paged, searchable, sortable.
 const getRecipes = async (req, res, next) => {
     try {
         return res.json(await listRecipes({ isPublic: true }, req.query));
@@ -238,12 +229,9 @@ const getRecipes = async (req, res, next) => {
     }
 };
 
-// Get recipes belonging to the logged-in user (public + private)
+// The logged-in user's own recipes, public and private.
 const getMyRecipes = async (req, res, next) => {
     try {
-        // $match does no schema-aware casting the way find() does, so the id
-        // off the token has to be converted by hand — as a string it silently
-        // matches nothing at all.
         if (!mongoose.isValidObjectId(req.user.userId)) {
             return res.status(401).json({ message: 'Invalid or expired token' });
         }
@@ -255,13 +243,9 @@ const getMyRecipes = async (req, res, next) => {
     }
 };
 
-// Get recipe by ID
+// One recipe by id.
 const getRecipe = async (req, res, next) => {
     try {
-        // A recipe has a page of its own now, so this id arrives from the
-        // address bar as often as from a card. Anything that is not an id at
-        // all is simply not found — findById would otherwise throw a CastError
-        // and answer 500 to what is really a typo.
         if (!mongoose.isValidObjectId(req.params.id)) {
             return res.status(404).json({ message: 'Recipe not found' });
         }
@@ -271,9 +255,7 @@ const getRecipe = async (req, res, next) => {
             return res.status(404).json({ message: 'Recipe not found' });
         }
 
-        // And a private one has a URL that can be guessed or passed on. Anyone
-        // but its author is told it is not there, rather than that it is there
-        // and they may not look — which would confirm it exists.
+        // A private recipe reads as missing to anyone but its author.
         const ownerId = (recipe.createdBy?._id ?? recipe.createdBy)?.toString();
         if (!recipe.isPublic && (!req.user || req.user.userId !== ownerId)) {
             return res.status(404).json({ message: 'Recipe not found' });
@@ -286,19 +268,7 @@ const getRecipe = async (req, res, next) => {
 };
 
 /**
- * Decides what `image`, `thumbnail` and `imagePublicId` should become for one
- * write, uploading to Cloudinary when the request carries a new photo.
- *
- * A newly picked photo arrives as `file` — the binary multipart part, already
- * downscaled and re-encoded by the browser. Everything else is expressed in
- * `body.image`, which has three meanings:
- *
- *   absent      leave the recipe's photo exactly as it is
- *   ''          the photo was removed
- *   https://…   a URL this app wrote earlier, echoed back by the edit form
- *
- * `thumbnail` is never taken from the caller. It is a Cloudinary derivative of
- * the image, so accepting one would only be a way to make the two disagree.
+ * Resolves `image`, `thumbnail` and `imagePublicId` for one write.
  *
  * @param {object} body
  * @param {object|null} existing  the recipe as stored, on an edit
@@ -308,14 +278,9 @@ const getRecipe = async (req, res, next) => {
 async function resolveImage(body, existing = null, file = undefined) {
     const nothingToDo = { patch: {}, uploaded: null, orphan: null };
 
-    // The asset the recipe holds now. Once the field points somewhere else it
-    // has nobody left to reference it, so it gets swept up after the write.
     const previous = existing?.imagePublicId || null;
 
     if (file) {
-        // Type, size and leading bytes are settled here, before the bytes are
-        // handed to anyone else. Cloudinary is never asked to arbitrate what
-        // counts as an image, and a bad upload costs no bandwidth to reject.
         const check = inspectImageBuffer(file.buffer, file.mimetype);
         if (!check.ok) return { error: check.message };
 
@@ -335,7 +300,6 @@ async function resolveImage(body, existing = null, file = undefined) {
     if (body.image === undefined) return nothingToDo;
 
     if (!body.image) {
-        // Already empty: say so rather than issuing a pointless $set.
         if (existing && !existing.image) return nothingToDo;
         return {
             patch: { image: '', thumbnail: '', imagePublicId: '' },
@@ -344,18 +308,11 @@ async function resolveImage(body, existing = null, file = undefined) {
         };
     }
 
-    // The overwhelmingly common case: an edit that did not touch the photo.
-    // Returning an empty patch keeps the derived thumbnail and the public id
-    // in place, which re-sending the URL on its own could not. Tested before
-    // the ownership check so that changing or dropping the credentials later
-    // cannot make an existing recipe uneditable.
+    // An edit that did not touch the photo.
     if (existing && body.image === existing.image) return nothingToDo;
 
     if (isStoredImageUrl(body.image)) {
-        // A URL on our cloud that this recipe was not already using. It is
-        // safe to point at, but the asset belongs to some other document, so
-        // no public id is recorded — this recipe must never be able to delete
-        // a photo it does not own.
+        // No public id: the asset belongs to another document.
         const thumbnail = isStoredImageUrl(body.thumbnail) ? body.thumbnail : body.image;
         return {
             patch: { image: body.image, thumbnail, imagePublicId: '' },
@@ -367,9 +324,7 @@ async function resolveImage(body, existing = null, file = undefined) {
     return { error: 'A photo has to be uploaded as a file, not sent as a link.' };
 }
 
-// Every optional field, paired with the function that vets it. Each normalizer
-// answers `{ ok: true, <key>: value }` or `{ ok: false, message }`, so the loop
-// below does not need to know anything about what it is checking.
+// Optional fields paired with their normalizer.
 const OPTIONAL_FIELDS = [
     ['allergens', normalizeAllergens],
     ['diets', normalizeDiets],
@@ -382,13 +337,8 @@ const OPTIONAL_FIELDS = [
 ];
 
 /**
- * Validates every optional field off a request body: the video link, the
- * allergen and dietary lists, when and where the food is eaten, and the
- * per-serving figures.
- *
- * Keys the caller did not send are left out of the returned patch entirely, so
- * the same helper backs both the create — where absent means "none", handled
- * by the schema defaults — and the edit, where absent means "leave alone".
+ * Validates the optional fields off a request body. Keys the caller did not
+ * send are left out of the patch.
  *
  * @returns {{ patch: object } | { error: string }}
  */
@@ -398,7 +348,7 @@ const readOptionalFields = (body) => {
     if (body.videoUrl !== undefined) {
         const raw = text(body.videoUrl);
         if (!raw) {
-            patch.videoUrl = ''; // an emptied field is how the link is removed
+            patch.videoUrl = '';
         } else {
             const link = normalizeVideoUrl(raw);
             if (!link.ok) return { error: link.message };
@@ -410,18 +360,15 @@ const readOptionalFields = (body) => {
         if (body[key] === undefined) continue;
         const result = normalize(body[key]);
         if (!result.ok) return { error: result.message };
-        // Normalizers answer under their own key — `value` for the plain
-        // numbers, the field's own name for the lists.
         patch[key] = key in result ? result[key] : result.value;
     }
 
     return { patch };
 };
 
-// Add a new recipe
+// Add a new recipe.
 const addRecipe = async (req, res, next) => {
-    // Tracked outside the try so a failure *after* the upload can clean up the
-    // asset it left behind on Cloudinary.
+    // Outside the try so a later failure can clean the uploaded asset up.
     let uploaded = null;
     try {
         const { isPublic } = req.body;
@@ -435,8 +382,6 @@ const addRecipe = async (req, res, next) => {
             return res.status(400).json({ message: 'Required parameters missing' });
         }
 
-        // Kept to whole minutes so the "quickest" sort has something to work
-        // with — the listing converts this field to a number.
         if (parseMinutes(time) === null) {
             return res.status(400).json({ message: `Time must be whole minutes between 1 and ${MAX_MINUTES}.` });
         }
@@ -451,9 +396,7 @@ const addRecipe = async (req, res, next) => {
             return res.status(400).json({ message: conflict });
         }
 
-        // Last, because it is the only step that leaves the machine: every
-        // cheap reason to reject this request has already been ruled out, so
-        // nothing is uploaded for a recipe that was about to be refused.
+        // Last, so nothing is uploaded for a recipe about to be refused.
         const photo = await resolveImage(req.body, null, req.file);
         if (photo.error) {
             return res.status(photo.status || 400).json({ message: photo.error });
@@ -474,14 +417,12 @@ const addRecipe = async (req, res, next) => {
 
         return res.status(201).json(recipe);
     } catch (err) {
-        // The recipe was never written, so an uploaded photo now belongs to
-        // nothing. Best effort — the original error is what matters here.
         await destroyImage(uploaded);
         next(err);
     }
 };
 
-// Edit a recipe
+// Edit a recipe.
 const editRecipe = async (req, res, next) => {
     let uploaded = null;
     try {
@@ -496,9 +437,7 @@ const editRecipe = async (req, res, next) => {
 
         const { title, ingredients, instructions, time, isPublic } = req.body;
 
-        // An edit sends only what it means to change, so an absent field is
-        // left alone — but one that arrives blank would wipe a column the
-        // schema calls required, and findByIdAndUpdate runs no validators.
+        // Absent means "leave alone"; blank would wipe a required column.
         for (const key of ['title', 'ingredients', 'instructions', 'time']) {
             if (req.body[key] !== undefined && !text(req.body[key])) {
                 return res.status(400).json({ message: 'Required parameters missing' });
@@ -514,8 +453,7 @@ const editRecipe = async (req, res, next) => {
             return res.status(400).json({ message: optional.error });
         }
 
-        // Either list can be missing from an edit, so the check runs against
-        // what the recipe would end up with rather than what was sent.
+        // Checked against what the recipe would end up with.
         const conflict = findDietConflict(
             optional.patch.diets ?? recipe.diets,
             optional.patch.allergens ?? recipe.allergens,
@@ -534,10 +472,7 @@ const editRecipe = async (req, res, next) => {
         if (isPublic !== undefined) patch.isPublic = Boolean(isPublic);
         const updated = await Recipes.findByIdAndUpdate(req.params.id, patch, { new: true });
 
-        // Only now that the document points somewhere else is the photo it used
-        // to point at safe to remove. Awaited rather than left running: on a
-        // serverless host the process can be frozen the moment the response
-        // goes out, and a detached promise would simply never finish.
+        // Awaited: a serverless process can freeze once the response is sent.
         if (photo.orphan) await destroyImage(photo.orphan);
 
         return res.json(updated);
@@ -547,7 +482,7 @@ const editRecipe = async (req, res, next) => {
     }
 };
 
-// Delete a recipe
+// Delete a recipe.
 const deleteRecipe = async (req, res, next) => {
     try {
         const recipe = await Recipes.findById(req.params.id);
@@ -560,11 +495,7 @@ const deleteRecipe = async (req, res, next) => {
         }
 
         await Recipes.findByIdAndDelete(req.params.id);
-        // Otherwise every user who saved it keeps a row pointing at nothing,
-        // and their favourites page quietly comes up one short.
         await RecipeInteraction.deleteMany({ recipe: recipe._id });
-        // And the photo would sit in Cloudinary forever, billed for, with the
-        // only record of its existence now deleted.
         await destroyImage(recipe.imagePublicId);
 
         return res.json({ message: 'Recipe deleted' });
@@ -574,8 +505,7 @@ const deleteRecipe = async (req, res, next) => {
 };
 
 module.exports = {
-    // Not a route handler: controller/interactionController.js reuses it so the
-    // favourites and likes pages page, search and sort exactly as these do.
+    // Not a route handler — reused by interactionController.
     listRecipes,
     getRecipes,
     getMyRecipes,

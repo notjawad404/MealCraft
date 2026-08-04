@@ -1,10 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 
-/**
- * Gate for routes that need a signed-in user. Sends guests to the login page
- * and remembers where they were headed so they land there afterwards.
- */
+/** Gate for routes needing a signed-in user; remembers the intended path. */
 export default function ProtectedRoute() {
   const { isAuthenticated } = useAuth();
   const location = useLocation();

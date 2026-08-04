@@ -9,9 +9,7 @@ import {
 import FilterAccordion from './FilterAccordion';
 import SearchBox from './SearchBox';
 
-/**
- * Search box, sort picker, and accordion filter drawer toggle.
- */
+/** Search box, sort picker and filter drawer toggle. */
 export default function RecipeToolbar({
   search,
   onSearchChange,

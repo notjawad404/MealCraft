@@ -6,26 +6,15 @@ import { ControlButton, Icon } from './videoControls';
 const fullscreenElement = () => document.fullscreenElement ?? document.webkitFullscreenElement ?? null;
 
 /**
- * A recipe's video, however it was linked.
- *
- * There are two players behind this, deliberately:
- *
- *   - A provider link is shown in that provider's own embedded player. Quality,
- *     captions, chapters and playback speed are all things YouTube and Vimeo do
- *     properly, in a document this page cannot reach into; replacing their
- *     controls with ours would mean giving those up, not gaining them.
- *   - A direct file has no such player, so FileVideo supplies one.
- *
- * Either way this component owns the frame around it: full screen, and theatre
- * mode when the surrounding page offers one.
+ * A recipe's video: the provider's own embed, or FileVideo for a direct file.
+ * Owns the frame either way — full screen and theatre mode. See docs/FRONTEND.md.
  */
 export default function VideoPlayer({ url, title, theater = false, onToggleTheater }) {
   const parsed = useMemo(() => parseVideoUrl(url), [url]);
   const shellRef = useRef(null);
   const [fullscreen, setFullscreen] = useState(false);
 
-  // Tracked by event rather than by our own click: leaving full screen with the
-  // escape key never goes through the button, and the icon has to follow.
+  // Tracked by event, since escape leaves full screen without the button.
   useEffect(() => {
     const onChange = () => setFullscreen(fullscreenElement() === shellRef.current);
     document.addEventListener('fullscreenchange', onChange);
@@ -48,7 +37,6 @@ export default function VideoPlayer({ url, title, theater = false, onToggleTheat
   }, []);
 
   if (!parsed) {
-    // Only reachable for a link stored before this parser knew about it.
     return (
       <div className="grid aspect-video w-full place-items-center rounded-2xl bg-night-900 px-6 text-center">
         <div>
@@ -92,17 +80,13 @@ export default function VideoPlayer({ url, title, theater = false, onToggleTheat
               src={embedSrc(parsed)}
               title={title}
               className="h-full w-full border-0"
-              // Everything the embedded players need; without `fullscreen`
-              // their own expand button is greyed out inside the frame.
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
               allowFullScreen
               referrerPolicy="strict-origin-when-cross-origin"
             />
           </div>
 
-          {/* Sits under the frame rather than over it: the provider's own
-              controls are along the bottom edge inside, and covering those is
-              exactly the wrong trade. */}
+          {/* Under the frame, so the provider's own controls stay uncovered. */}
           <div className="flex items-center gap-0.5 px-2 py-1">
             <span className="px-2 text-[11px] font-semibold uppercase tracking-widest text-ink-400">
               {PROVIDER_LABELS[parsed.provider]}

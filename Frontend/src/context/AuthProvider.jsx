@@ -5,7 +5,7 @@ import { isTokenExpired, millisUntilExpiry } from '../lib/token';
 
 const STORAGE_KEY = 'mealcraft-auth';
 
-/** Restore a session from storage, discarding anything malformed or expired. */
+/** Restores a session from storage, discarding anything malformed or expired. */
 function readStoredSession() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -25,7 +25,7 @@ function readStoredSession() {
 export default function AuthProvider({ children }) {
   const [session, setSession] = useState(readStoredSession);
 
-  // Mirror the session into storage so a refresh keeps the user signed in.
+  // Mirrored into storage so a refresh keeps the user signed in.
   useEffect(() => {
     try {
       if (session) {
@@ -38,8 +38,7 @@ export default function AuthProvider({ children }) {
     }
   }, [session]);
 
-  // Drop the session the moment the token expires, rather than letting the
-  // user discover it on their next failed request.
+  // Dropped the moment the token expires.
   useEffect(() => {
     if (!session?.token) return undefined;
 
@@ -50,12 +49,12 @@ export default function AuthProvider({ children }) {
       return undefined;
     }
 
-    // setTimeout caps out around 24.8 days; our tokens live 7 days.
+    // Within setTimeout's ~24.8 day ceiling.
     const timer = setTimeout(() => setSession(null), remaining);
     return () => clearTimeout(timer);
   }, [session]);
 
-  // Keep other tabs in sync when someone logs in or out.
+  // Keeps other tabs in sync.
   useEffect(() => {
     const onStorage = (event) => {
       if (event.key === STORAGE_KEY) setSession(readStoredSession());

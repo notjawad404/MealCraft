@@ -21,17 +21,16 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />
             <Route path="/recipes" element={<Recipes />} />
-            {/* Open to everyone: the API is what keeps a private recipe out of
-                a stranger's hands, not the routing. */}
+            {/* Open to everyone; the API gates private recipes. */}
             <Route path="/recipes/:id" element={<RecipeDetail />} />
 
-            {/* Signed-in users get bounced back out of these. */}
+            {/* Signed-in users are bounced out of these. */}
             <Route element={<GuestRoute />}>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
             </Route>
 
-            {/* Guests are sent to /login and returned here afterwards. */}
+            {/* Guests are sent to /login and returned afterwards. */}
             <Route element={<ProtectedRoute />}>
               <Route path="/add" element={<AddRecipe />} />
               <Route path="/my-recipes" element={<MyRecipes />} />

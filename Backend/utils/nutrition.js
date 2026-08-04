@@ -1,16 +1,6 @@
-// Servings, calories and the per-serving nutrient list.
-//
-// Everything here is optional: a cook who does not know the numbers leaves them
-// out, and the recipe is no less usable for it. What is stored is therefore
-// either a real figure or nothing at all — never a zero standing in for
-// "unknown", which would read as "contains no protein".
-//
-// Calories are their own field rather than the first row of the nutrient list:
-// it is the one figure worth showing on a card, and the one worth sorting or
-// filtering by later. Everything else is a name, an amount and a unit.
+// Servings, calories and the per-serving nutrient list. See docs/BACKEND.md.
 
-// Nutrients we know the customary unit for. Anything outside this list is kept
-// as the cook typed it — the list is a convenience, not a limit.
+// Nutrients with a known customary unit. Not a closed list.
 const NUTRIENTS = {
     protein: 'g',
     carbohydrates: 'g',
@@ -37,19 +27,16 @@ const NUTRIENTS = {
     folate: 'µg',
 };
 
-// Percent is here for the "% of your daily intake" figures on packaging, which
-// is how some cooks will have the number to hand.
 const UNITS = ['g', 'mg', 'µg', 'IU', '%'];
 
-// The micro sign is out of reach on most keyboards, and the Greek mu that gets
-// pasted in its place is a different character with the same shape.
+// Common substitutes for the micro sign.
 const UNIT_ALIASES = { mcg: 'µg', ug: 'µg', 'μg': 'µg' };
 
 const MAX_NUTRIENTS = 30;
 const MAX_NAME_LENGTH = 40;
 const MAX_AMOUNT = 100000;
 const MAX_SERVINGS = 1000;
-const MAX_CALORIES = 20000; // per serving, and generous even so
+const MAX_CALORIES = 20000;
 
 const NUTRIENT_NAME = /^[\p{L}\p{N}][\p{L}\p{N} '&(),./-]*$/u;
 
@@ -75,7 +62,7 @@ function readWholeNumber(value, { field, max, min = 1 }) {
 const normalizeServings = (value) =>
     readWholeNumber(value, { field: 'Servings', max: MAX_SERVINGS });
 
-// Zero is a real answer here — a cup of black tea is not an unknown quantity.
+// Zero is a valid figure, so the minimum differs from servings.
 const normalizeCalories = (value) =>
     readWholeNumber(value, { field: 'Calories', max: MAX_CALORIES, min: 0 });
 
@@ -101,8 +88,7 @@ function normalizeNutrients(value) {
         }
 
         const name = String(row.name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-        // A half-typed row is dropped rather than rejected — the form always
-        // has one empty row waiting at the bottom.
+        // Wholly empty rows are dropped rather than rejected.
         if (!name && (row.amount === undefined || row.amount === '')) continue;
 
         if (!name) return reject('Every nutrition row needs a name.');
@@ -134,8 +120,6 @@ function normalizeNutrients(value) {
         }
 
         seen.add(name);
-        // Two decimals is past the precision anyone measures a vitamin to, and
-        // stops a float artefact being stored as 0.30000000000000004.
         nutrients.push({ name, amount: Math.round(amount * 100) / 100, unit });
     }
 

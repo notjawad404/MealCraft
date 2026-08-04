@@ -3,7 +3,7 @@ import { NUTRIENT_OPTIONS, NUTRIENT_UNITS, unitForNutrient } from '../../lib/rec
 
 const emptyRow = () => ({ name: '', amount: '', unit: 'g' });
 
-// Typing a name that is one of the known nutrients fills its usual unit in.
+// A known nutrient name fills its usual unit in.
 const knownUnit = (name) => {
   const match = name.trim().toLowerCase();
   const option = NUTRIENT_OPTIONS.find(
@@ -13,12 +13,8 @@ const knownUnit = (name) => {
 };
 
 /**
- * The per-serving nutrition table: a name, an amount and a unit per row.
- *
- * The name is an ordinary text box backed by a datalist rather than a select,
- * because the list of nutrients someone might know a figure for is longer than
- * any list worth scrolling — the suggestions are there to save typing, not to
- * decide what counts.
+ * The per-serving nutrition table: a name, an amount and a unit per row. The
+ * name is a text box backed by a datalist, so any nutrient can be typed.
  */
 export default function NutritionInput({ values, onChange, error, disabled }) {
   const listId = useId();
@@ -59,8 +55,7 @@ export default function NutritionInput({ values, onChange, error, disabled }) {
 
       <ul className="space-y-2">
         {rows.map((row, index) => (
-          // Rows carry no id of their own and cannot be reordered, so the
-          // index is a safe key.
+          // Rows have no id and cannot be reordered, so the index is safe.
           <li key={index} className="flex items-center gap-2">
             <input
               type="text"

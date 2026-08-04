@@ -1,7 +1,6 @@
 import { useId, useState } from 'react';
 
-// Tailwind only sees class names that appear literally in the source, so the
-// two tones are written out in full rather than built from a colour prop.
+// Written out in full: Tailwind only sees literal class names.
 const TONES = {
   ember: 'border-ember-600 bg-ember-600 text-paper-50 dark:border-ember-500 dark:bg-ember-500 dark:text-night-900',
   sage: 'border-sage-700 bg-sage-700 text-paper-50 dark:border-sage-500 dark:bg-sage-500 dark:text-night-900',
@@ -15,14 +14,12 @@ const CHIP =
   'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold ' +
   'transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40';
 
-/** Trim and collapse the spacing, the way the API stores these. */
+/** Trim and collapse the spacing, matching how the API stores these. */
 const tidy = (value) => value.trim().replace(/\s+/g, ' ');
 
 /**
- * A multi-select rendered as toggleable chips, optionally letting the user type
- * their own on the end. `selected` is a plain array of stored values — for the
- * allergen list that is a mix of known slugs and free text, so anything not in
- * `options` is shown as its own removable chip rather than dropped.
+ * A multi-select of toggleable chips. Values not in `options` render as their
+ * own removable chips.
  *
  * Pass `custom` to enable the free-text row:
  * `{ placeholder, addLabel, suggestions?, preserveCase? }`.
@@ -64,13 +61,12 @@ export default function ChipPicker({
   };
 
   const addDraft = () => {
-    // Proper nouns keep their capitals; tags are stored lower-case.
     const tidied = tidy(draft);
     const value = custom?.preserveCase ? tidied : tidied.toLowerCase();
     if (!value) return;
 
-    // Someone typing "tree nuts" means the option two rows up, not a second
-    // tag beside it. Match on the wording as well as the stored value.
+    // Matched on the wording as well as the value, so typed text folds into
+    // the option it names.
     const lower = value.toLowerCase();
     const matched = options.find(
       (option) => option.value === lower || option.label.toLowerCase() === lower,
@@ -79,7 +75,6 @@ export default function ChipPicker({
 
     setDraft('');
     setNotice('');
-    // Case-insensitively, so "Italy" cannot be added under an existing "italy".
     if (selected.some((entry) => entry.toLowerCase() === next.toLowerCase())) return;
     if (full) {
       setNotice(`That is the limit of ${max}.`);
@@ -88,7 +83,7 @@ export default function ChipPicker({
     onChange([...selected, next]);
   };
 
-  // Enter here means "add this one", not "submit the recipe".
+  // Enter adds the chip rather than submitting the form.
   const onDraftKeyDown = (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();

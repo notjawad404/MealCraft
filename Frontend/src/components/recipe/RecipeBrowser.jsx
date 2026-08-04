@@ -9,7 +9,7 @@ import RecipeToolbar from './RecipeToolbar';
 
 const GRID = 'grid gap-6 sm:grid-cols-2 lg:grid-cols-3';
 
-// Clears the sticky navbar (72px) so the first row is not tucked underneath it.
+// Clears the sticky navbar.
 const STICKY_NAV_OFFSET = 88;
 
 function Skeletons() {
@@ -47,18 +47,11 @@ function Empty({ title, body, action }) {
 }
 
 /**
- * The list body shared by the public and personal recipe pages: search, sort
- * and paging, with the URL as the single source of truth so a filtered view can
- * be linked to and the back button behaves.
+ * The list body shared by the public and personal recipe pages: search, sort,
+ * filters and paging, with the URL as the source of truth. See docs/FRONTEND.md.
  *
- * `fetchPage` must be stable — wrap it in useCallback — and takes
- * `{ search, sort, page, limit, signal }`.
- *
- * `manage` turns on the owner's controls on every card. It says what the
- * actions *do* — `{ editPath(recipe), deleteRecipe(recipe),
- * setVisibility(recipe, isPublic) }` — and this component owns what they mean
- * for the list underneath: a flipped badge is patched in place, a deleted
- * recipe costs a refetch so the count and the paging stay honest.
+ * `fetchPage` must be stable — wrap it in useCallback.
+ * `manage` is `{ editPath(recipe), deleteRecipe(recipe), setVisibility(recipe, isPublic) }`.
  */
 export default function RecipeBrowser({
   fetchPage,
@@ -118,22 +111,17 @@ export default function RecipeBrowser({
     });
   };
 
-  // The box is local so typing stays instant; the URL only catches up once the
-  // typing settles.
+  // Local, so typing stays instant; the URL catches up once it settles.
   const [searchInput, setSearchInput] = useState(search);
   const debouncedSearch = useDebouncedValue(searchInput.trim(), 350);
 
   const resultsRef = useRef(null);
   const scrollOnNextResults = useRef(false);
 
-  // `data` deliberately survives across fetches. Blanking it and dropping back
-  // to skeletons on every keystroke, sort or page turn is what made the grid
-  // flicker; instead the previous results stay put and dim until the new ones
-  // land. Skeletons are then only ever seen once, on the very first load.
+  // `data` survives across fetches; the grid dims rather than blanking.
   const [state, setState] = useState({ data: null, error: '', pending: true });
 
-  // Bumped after a delete, to ask the current page for again — the total, the
-  // page count and what spills over from the next page all move with it.
+  // Bumped after a delete to refetch the current page.
   const [reloadKey, setReloadKey] = useState(0);
 
   const patchParams = (changes, options) =>
@@ -146,9 +134,7 @@ export default function RecipeBrowser({
       return next;
     }, options);
 
-  // Settled search text goes into the URL, which is what actually triggers a
-  // fetch. Replaced rather than pushed, so a search does not bury the previous
-  // page under one history entry per pause in typing.
+  // Replaced rather than pushed, so typing does not fill up the history.
   useEffect(() => {
     if (debouncedSearch === search) return;
     patchParams({ q: debouncedSearch, page: null }, { replace: true });
@@ -183,8 +169,7 @@ export default function RecipeBrowser({
       )
       .catch((err) => {
         if (controller.signal.aborted) return;
-        // The last good results are kept underneath the error, so a dropped
-        // request does not wipe the page out.
+        // The last good results are kept underneath the error.
         setState((previous) => ({ ...previous, error: err.message, pending: false }));
       });
 
@@ -205,7 +190,7 @@ export default function RecipeBrowser({
     reloadKey,
   ]);
 
-  /** One recipe changed underneath us — swap it in without disturbing the page. */
+  /** Swap one recipe in without disturbing the page. */
   const patchRecipe = (id, changes) =>
     setState((previous) =>
       previous.data
@@ -221,8 +206,7 @@ export default function RecipeBrowser({
         : previous,
     );
 
-  // Handed to each card. The errors are deliberately left to travel back up out
-  // of these promises: the card is what shows them, next to the recipe.
+  // Handed to each card. Errors travel back out of these promises to the card.
   const manageRecipe = (recipe) =>
     manage && {
       editPath: manage.editPath(recipe),
@@ -236,8 +220,7 @@ export default function RecipeBrowser({
       },
     };
 
-  // Reachable by editing the URL, or by landing on a deep page whose recipes
-  // have since been deleted.
+  // Clamp a page number past the end back into range.
   const data = state.data;
   useEffect(() => {
     if (data && data.total > 0 && data.page > data.pages) {
@@ -247,10 +230,7 @@ export default function RecipeBrowser({
   }, [data]);
 
   const goToPage = (next) => {
-    // The scroll itself is deferred until the new page has rendered. Scrolling
-    // straight away works against a document that is still 20 cards tall; when
-    // it shrinks to 2 the browser clamps the scroll back up, which is the exact
-    // jump this is meant to remove.
+    // Deferred until the new page has rendered and settled its height.
     scrollOnNextResults.current = true;
     patchParams({ page: next > 1 ? next : null });
   };
@@ -262,8 +242,6 @@ export default function RecipeBrowser({
     const element = resultsRef.current;
     if (!element) return;
 
-    // Everything above the grid is fixed height, so this lands in the same
-    // place whether the page holds twenty cards or two.
     const top = element.getBoundingClientRect().top + window.scrollY - STICKY_NAV_OFFSET;
     window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   }, [data]);
@@ -271,11 +249,7 @@ export default function RecipeBrowser({
   const { error, pending } = state;
   const total = data?.total ?? 0;
 
-  // A local API answers in tens of milliseconds. Dimming the grid for that long
-  // is just a blink — a second kind of flicker, in place of the one being
-  // fixed. So the loading treatment waits to see whether the request is
-  // actually slow enough to be worth mentioning; most of the time it never
-  // appears at all and the swap looks instant.
+  // Held back briefly, so a fast response never flashes a loading treatment.
   const [showPending, setShowPending] = useState(false);
   useEffect(() => {
     if (!pending) {
@@ -286,8 +260,7 @@ export default function RecipeBrowser({
     return () => clearTimeout(timer);
   }, [pending]);
 
-  // Skeletons belong to the cold start only — every later fetch has something
-  // real to show while it waits.
+  // Skeletons belong to the cold start only.
   const firstLoad = pending && !data;
 
   return (
@@ -326,7 +299,7 @@ export default function RecipeBrowser({
         </p>
       )}
 
-      {/* Always 2px tall, present or not, so nothing shifts when it appears. */}
+      {/* Always 2px tall, so nothing shifts when it appears. */}
       <div className="h-0.5 overflow-hidden rounded-full" aria-hidden="true">
         {showPending && !firstLoad && (
           <div className="h-full w-1/3 animate-progress rounded-full bg-ember-500 dark:bg-ember-400" />
@@ -338,12 +311,8 @@ export default function RecipeBrowser({
       {data && (
         <div
           ref={resultsRef}
-          // Dimmed rather than unmounted while the next page is in flight, and
-          // inert so a second click cannot land on results about to be replaced.
-          //
-          // The min-height is a floor, not padding: a last page holding two
-          // cards would otherwise leave the document too short to scroll their
-          // row up to the top, and the footer would ride up under them.
+          // Dimmed and inert rather than unmounted while a fetch is in flight.
+          // The min-height keeps a short last page scrollable.
           className={`min-h-[55vh] transition-opacity duration-200 ease-out ${
             showPending ? 'pointer-events-none opacity-40' : 'opacity-100'
           }`}

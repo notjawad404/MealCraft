@@ -1,9 +1,6 @@
 import { useState } from 'react';
 
-/**
- * Labelled input with inline validation messaging. Password inputs get a
- * reveal toggle so people can check what they typed instead of a confirm field.
- */
+/** Labelled input with inline validation. Password inputs get a reveal toggle. */
 export default function Field({
   id,
   label,

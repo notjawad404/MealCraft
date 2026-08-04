@@ -4,13 +4,8 @@ import { ACCEPTED_TYPES, ImageError, formatBytes, optimizeImage } from '../../li
 /**
  * Picks a photo, shrinks it, and hands back the Blob that will be uploaded.
  *
- * The work happens here rather than at submit time so the cost of the picture
- * is visible before anyone commits to it — and so a 6 MB phone photo has
- * already become a couple of hundred kilobytes by the time Save is pressed.
- *
- * `onChange` receives `{ file, url }`. `file` is a newly picked Blob to upload;
- * `url` is the photo the recipe already has, which on an edit is the Cloudinary
- * URL the backend wrote last time. Both are null/'' once the photo is removed.
+ * `onChange` receives `{ file, url }`: `file` is a newly picked Blob, `url` is
+ * the photo the recipe already has. Both clear when the photo is removed.
  */
 export default function ImageUpload({ file, url, onChange, disabled }) {
   const inputId = useId();
@@ -22,9 +17,7 @@ export default function ImageUpload({ file, url, onChange, disabled }) {
   const [meta, setMeta] = useState(null);
   const [preview, setPreview] = useState('');
 
-  // A Blob has no address until one is minted for it, and each one holds the
-  // Blob in memory until it is revoked — hence the cleanup on replacement and
-  // on unmount. A photo the recipe already has is just a URL and needs neither.
+  // Object URLs pin the Blob in memory, so each one is revoked when replaced.
   useEffect(() => {
     if (!file) {
       setPreview('');

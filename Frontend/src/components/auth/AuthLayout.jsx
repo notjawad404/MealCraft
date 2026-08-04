@@ -1,9 +1,6 @@
 import { Link } from 'react-router-dom';
 
-/**
- * Split shell shared by the login and register pages: the form on paper,
- * an editorial panel alongside it on wider screens.
- */
+/** Split shell shared by the login and register pages. */
 export default function AuthLayout({
   eyebrow,
   title,

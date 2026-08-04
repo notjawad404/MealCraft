@@ -9,17 +9,13 @@ export class ApiError extends Error {
 }
 
 /**
- * Thin wrapper around fetch that speaks the backend's JSON conventions:
- * success bodies are returned as-is, failures throw an ApiError carrying the
- * server's `message` field.
+ * fetch wrapper: success bodies are returned as-is, failures throw an ApiError
+ * carrying the server's `message`.
  */
 export async function apiRequest(path, { method = 'GET', body, token, signal } = {}) {
   let response;
 
-  // FormData carries a photo, and its Content-Type has to include the multipart
-  // boundary the browser generates. Setting the header by hand would omit that
-  // and the server would fail to parse a request that is otherwise perfectly
-  // formed, so it is left off deliberately.
+  // Content-Type is left unset for FormData so the browser adds the boundary.
   const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
 
   try {
@@ -33,8 +29,7 @@ export async function apiRequest(path, { method = 'GET', body, token, signal } =
       body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
     });
   } catch (err) {
-    // A cancelled request is the caller superseding itself, not a failure —
-    // it must stay distinguishable so callers can ignore it.
+    // Rethrown unwrapped so callers can tell a cancellation from a failure.
     if (err?.name === 'AbortError') throw err;
     throw new ApiError(
       'Could not reach the server. Check that the backend is running.',
@@ -88,21 +83,14 @@ function listQuery({ search, sort, page, limit, mealType, region, country, diet,
 }
 
 /**
- * A recipe write goes up as plain JSON, unless it carries a newly picked photo
- * — then it becomes multipart: the photo as binary, and everything else as one
- * JSON `payload` part.
- *
- * Splitting it that way rather than spreading the recipe across form fields
- * keeps the nutrient rows and the tag lists as the arrays they are; multipart
- * on its own would flatten every one of them to a string.
+ * Plain JSON, or multipart when a newly picked photo comes with it: the photo
+ * as binary and the rest as one JSON `payload` part.
  */
 function recipeBody(payload, photo) {
   if (!photo) return payload;
 
   const form = new FormData();
   form.append('payload', JSON.stringify(payload));
-  // The filename is only a label — Cloudinary assigns its own id — but multer
-  // wants one, and the extension keeps the part's type honest.
   form.append('image', photo, `photo.${(photo.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')}`);
   return form;
 }
@@ -111,29 +99,17 @@ export const recipeApi = {
   create: (payload, token, photo) =>
     apiRequest('/recipe', { method: 'POST', body: recipeBody(payload, photo), token }),
 
-  /**
-   * Change a recipe you own. Only the keys sent are touched, so this backs both
-   * the edit form — which sends the lot — and the visibility toggle, which
-   * sends `{ isPublic }` on its own.
-   */
+  /** Change a recipe you own. Only the keys sent are touched. */
   update: (id, payload, token, photo) =>
     apiRequest(`/recipe/${id}`, { method: 'PUT', body: recipeBody(payload, photo), token }),
 
-  /** Delete a recipe you own, along with everyone's saves of it. */
+  /** Delete a recipe you own. */
   remove: (id, token) => apiRequest(`/recipe/${id}`, { method: 'DELETE', token }),
 
   /** Public recipes. Returns `{ recipes, page, pages, total, limit }`. */
   list: ({ signal, ...options } = {}) => apiRequest(`/recipe${listQuery(options)}`, { signal }),
 
-  /**
-   * One whole recipe. Listings leave out the method and the full-size image to
-   * keep a page of twenty small, so anything showing a recipe in full has to
-   * come back for it.
-   *
-   * The token is optional and worth sending whenever there is one: without it
-   * the API cannot tell the author of a private recipe from a stranger, and
-   * answers 404 to both.
-   */
+  /** One whole recipe. Send the token when there is one, or a private recipe 404s. */
   get: (id, { token, signal } = {}) => apiRequest(`/recipe/${id}`, { token, signal }),
 
   /** The signed-in user's own recipes, public and private. */
@@ -148,13 +124,8 @@ export const recipeApi = {
     apiRequest(`/recipe/user/suggest?search=${encodeURIComponent(search ?? '')}`, { token, signal }),
 
   /*
-   * Likes and favourites. No page uses these yet — they are the API the
-   * favourites and likes pages will be built on.
-   *
-   * Setting and clearing are separate calls rather than one toggle, so a
-   * double-tapped heart cannot land back where it started: every one of these
-   * can be sent twice and mean the same thing. Each answers with the flag and
-   * the recipe's new total, e.g. `{ liked: true, likeCount: 12 }`.
+   * Likes and favourites; no page uses these yet. Safe to repeat. Each answers
+   * with the flag and the recipe's new total, e.g. `{ liked: true, likeCount: 12 }`.
    */
   like: (id, token) => apiRequest(`/recipe/${id}/like`, { method: 'PUT', token }),
   unlike: (id, token) => apiRequest(`/recipe/${id}/like`, { method: 'DELETE', token }),
@@ -167,10 +138,6 @@ export const recipeApi = {
   favourites: (token, { signal, ...options } = {}) =>
     apiRequest(`/recipe/saved/favourites${listQuery(options)}`, { token, signal }),
 
-  /**
-   * `{ likes: [id], favourites: [id] }` for the signed-in user — one call on
-   * load is enough to draw every heart on a page in its right state, and it
-   * keeps the listing endpoints unauthenticated.
-   */
+  /** `{ likes: [id], favourites: [id] }` for the signed-in user. */
   saved: (token, { signal } = {}) => apiRequest('/recipe/saved/ids', { token, signal }),
 };

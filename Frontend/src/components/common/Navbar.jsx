@@ -4,7 +4,7 @@ import Brand from './Brand';
 import ThemeToggle from './ThemeToggle';
 import useAuth from '../../hooks/useAuth';
 
-// "Add Recipe" is not here — the "Share a recipe" button below already covers it.
+// "Add Recipe" is covered by the "Share a recipe" button below.
 const publicLinks = [
   { to: '/', label: 'Home' },
   { to: '/recipes', label: 'Recipes' },

@@ -1,4 +1,4 @@
-/** Form-level error banner — server rejections, unreachable API, and so on. */
+/** Form-level error banner. */
 export default function FormAlert({ children }) {
   if (!children) return null;
 

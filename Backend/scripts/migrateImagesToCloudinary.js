@@ -1,19 +1,9 @@
 /*
- * Moves recipe photos that are still stored inline as base64 up to Cloudinary.
+ * Moves recipe photos still stored inline as base64 up to Cloudinary.
+ * Safe to stop and re-run. See docs/OPERATIONS.md.
  *
  *   node scripts/migrateImagesToCloudinary.js --dry-run
  *   node scripts/migrateImagesToCloudinary.js
- *
- * Recipes written before the move hold a `data:image/…;base64,…` string in
- * `image`, which is what put the collection under pressure in the first place.
- * Editing such a recipe migrates it on its own (see resolveImage in
- * controller/recipeController.js), but most recipes are never edited again, so
- * this walks the rest of them.
- *
- * Safe to stop and re-run: each document is matched on still having a data URI,
- * so anything already moved is skipped, and each is written the moment its
- * upload succeeds rather than at the end. An interrupted run leaves the
- * database consistent, just partly migrated.
  */
 
 const path = require('path');
@@ -21,11 +11,7 @@ const mongoose = require('mongoose');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-// Same override index.js applies, and for the same reason: this script runs on
-// a developer machine, which is exactly where a stopped Docker or VPN resolver
-// leaves Node pointed at 127.0.0.1 and fails the SRV lookup a mongodb+srv://
-// URI depends on. Without this the script cannot connect on the one host it
-// was written to be run from.
+// Same DNS override index.js applies; this script only ever runs locally.
 if (process.env.DNS_SERVERS) {
     require('dns').setServers(process.env.DNS_SERVERS.split(',').map((s) => s.trim()));
 }
@@ -36,12 +22,7 @@ const { isCloudinaryEnabled, uploadImage } = require('../utils/imageStore.js');
 
 const dryRun = process.argv.includes('--dry-run');
 
-/**
- * Legacy documents hold `data:image/jpeg;base64,…`. This is the only base64 in
- * the codebase, and it is here rather than in utils/ on purpose: it decodes
- * what is already in the database, and nothing in the live request path should
- * grow a reason to call it.
- */
+/** Decodes the `data:image/jpeg;base64,…` form legacy documents hold. */
 function decodeDataUrl(value) {
     const comma = value.indexOf(',');
     const header = value.slice('data:'.length, comma);
@@ -52,8 +33,6 @@ function decodeDataUrl(value) {
     return buffer;
 }
 
-// Anchored so it can use an index if one is ever added, and so it cannot match
-// a URL that merely mentions "data:" somewhere in the middle.
 const INLINE = { image: { $regex: '^data:' } };
 
 const formatBytes = (bytes) =>
@@ -80,8 +59,7 @@ async function main() {
     let failed = 0;
     let freed = 0;
 
-    // One at a time and lean: these documents are megabytes each, and pulling a
-    // page of twenty into memory to save round trips is a false economy.
+    // One at a time and lean: these documents are megabytes each.
     const cursor = Recipes.find(INLINE).select('title image thumbnail').lean().cursor();
 
     for await (const recipe of cursor) {
@@ -105,8 +83,7 @@ async function main() {
             freed += before;
             console.log(`migrated  ${label} — ${formatBytes(before)} freed`);
         } catch (err) {
-            // Logged and stepped over rather than aborting the run: one photo
-            // Cloudinary will not take should not strand the other forty-nine.
+            // Logged and stepped over rather than aborting the run.
             failed += 1;
             console.error(`FAILED    ${label} — ${err.message}`);
         }

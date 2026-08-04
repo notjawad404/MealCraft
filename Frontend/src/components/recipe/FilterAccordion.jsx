@@ -58,10 +58,7 @@ function Chip({ selected, onClick, children }) {
   );
 }
 
-/**
- * Accordion multi-filter component.
- * Fully styled for both light mode and dark mode.
- */
+/** Accordion multi-filter drawer. */
 export default function FilterAccordion({
   filters,
   onChange,

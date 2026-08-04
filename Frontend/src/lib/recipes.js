@@ -1,10 +1,10 @@
-/** Shared vocabulary for the two listing pages and the backend they talk to. */
+/** Shared vocabulary for the listing pages. Mirrors the API. */
 
 export const PAGE_SIZE = 20;
 
 export const DEFAULT_SORT = 'newest';
 
-// `value` has to match the keys of SORTS in Backend/controller/recipeController.js.
+// `value` must match the API's sort keys.
 export const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest first' },
   { value: 'oldest', label: 'Oldest first' },
@@ -15,7 +15,7 @@ export const SORT_OPTIONS = [
 
 export const isSort = (value) => SORT_OPTIONS.some((option) => option.value === value);
 
-/** Both `ingredients` and `instructions` are stored newline-joined. */
+/** `ingredients` and `instructions` are stored newline-joined. */
 export const splitLines = (value) =>
   (value ?? '')
     .split('\n')
@@ -26,11 +26,9 @@ export const splitIngredients = splitLines;
 
 /* ---- Allergens and diets ----------------------------------------------- */
 
-// `value` is what the API stores and accepts; `label` is only how it is worded
-// here. Both lists mirror Backend/utils/recipeTags.js — add to one and the
-// other has to follow, or the picker offers something the API rejects.
+// `value` is what the API accepts; `label` is only the wording.
 
-/** The fourteen declarable allergens. Cooks can add their own on top. */
+/** The fourteen declarable allergens. Free text is allowed on top. */
 export const ALLERGEN_OPTIONS = [
   { value: 'peanuts', label: 'Peanuts' },
   { value: 'tree-nuts', label: 'Tree nuts' },
@@ -48,7 +46,7 @@ export const ALLERGEN_OPTIONS = [
   { value: 'sulphites', label: 'Sulphites' },
 ];
 
-/** Closed list — "suitable for X" is a claim, so it cannot be free text. */
+/** Closed list. */
 export const DIET_OPTIONS = [
   { value: 'halal', label: 'Halal' },
   { value: 'kosher', label: 'Kosher' },
@@ -65,7 +63,7 @@ export const DIET_OPTIONS = [
   { value: 'paleo', label: 'Paleo' },
 ];
 
-/** Allergens each diet rules out — see the note in Backend/utils/recipeTags.js. */
+/** Allergens each diet rules out. */
 export const DIET_EXCLUDES = {
   vegan: ['dairy', 'eggs', 'fish', 'shellfish', 'molluscs'],
   vegetarian: ['fish', 'shellfish', 'molluscs'],
@@ -75,7 +73,7 @@ export const DIET_EXCLUDES = {
   'egg-free': ['eggs'],
 };
 
-/** When in the day the recipe is for. A recipe can be several at once. */
+/** Meal types. A recipe can be several at once. */
 export const MEAL_TYPE_OPTIONS = [
   { value: 'breakfast', label: 'Breakfast' },
   { value: 'brunch', label: 'Brunch' },
@@ -88,7 +86,7 @@ export const MEAL_TYPE_OPTIONS = [
   { value: 'drink', label: 'Drink' },
 ];
 
-/** Culinary regions. Countries are free text beside these. */
+/** Culinary regions. */
 export const REGION_OPTIONS = [
   { value: 'north-african', label: 'North African' },
   { value: 'west-african', label: 'West African' },
@@ -110,8 +108,7 @@ export const REGION_OPTIONS = [
   { value: 'oceanian', label: 'Oceanian' },
 ];
 
-// Autocomplete for the country field, not a limit on it — the field takes
-// anything, and this only saves the typing for the ones that come up most.
+// Autocomplete for the country field, not a limit on it.
 export const COUNTRY_SUGGESTIONS = [
   'Argentina', 'Australia', 'Austria', 'Bangladesh', 'Belgium', 'Brazil', 'Cambodia', 'Canada',
   'Chile', 'China', 'Colombia', 'Cuba', 'Denmark', 'Egypt', 'Ethiopia', 'France', 'Georgia',
@@ -130,9 +127,7 @@ export const MAX_COUNTRIES = 6;
 
 /* ---- Nutrition ---------------------------------------------------------- */
 
-// Offered in the nutrition editor with their customary unit filled in. Not a
-// closed list: a cook can type a nutrient that is not here. Calories are
-// missing on purpose — they have a field of their own.
+// Offered in the nutrition editor with their customary unit. Not a closed list.
 export const NUTRIENT_OPTIONS = [
   { value: 'protein', label: 'Protein', unit: 'g' },
   { value: 'carbohydrates', label: 'Carbohydrates', unit: 'g' },
@@ -177,7 +172,7 @@ const NUTRIENT_LABELS = labelsOf(NUTRIENT_OPTIONS);
 
 const sentenceCase = (value) => value.charAt(0).toUpperCase() + value.slice(1);
 
-/** Known allergens get their wording; a cook's own is shown as they typed it. */
+/** Known allergens get their wording; free text is shown as typed. */
 export const allergenLabel = (value) => ALLERGEN_LABELS.get(value) ?? sentenceCase(value);
 
 export const dietLabel = (value) => DIET_LABELS.get(value) ?? sentenceCase(value);
@@ -188,7 +183,7 @@ export const regionLabel = (value) => REGION_LABELS.get(value) ?? sentenceCase(v
 
 export const nutrientLabel = (value) => NUTRIENT_LABELS.get(value) ?? sentenceCase(value);
 
-/** The unit a nutrient is normally given in, for pre-filling the row. */
+/** The unit a nutrient is normally given in. */
 export const unitForNutrient = (value) =>
   NUTRIENT_OPTIONS.find((option) => option.value === value)?.unit ?? 'g';
 
@@ -196,11 +191,7 @@ export const unitForNutrient = (value) =>
 export const describeOrigin = ({ countries = [], regions = [] } = {}) =>
   [...countries, ...regions.map(regionLabel)].join(' · ');
 
-/**
- * The first contradiction between the two lists, or null. Mirrors the check the
- * API makes: a badge saying "nut-free" over an allergen list containing peanuts
- * is the one mistake here that could actually hurt someone.
- */
+/** The first contradiction between the two lists, or null. Mirrors the API. */
 export function findDietConflict(diets = [], allergens = []) {
   const declared = new Set(allergens);
 
@@ -214,21 +205,16 @@ export function findDietConflict(diets = [], allergens = []) {
   return null;
 }
 
-// Video links live in ./video.js — parsing them grew past what belongs here.
+// Video link parsing lives in ./video.js.
 
 const num = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 
 /**
- * Coerces a listing response into the paged shape the UI renders. A version of
- * the backend from before paging existed answers with a bare array, and a stale
- * dev server is the likeliest thing to hand one over — callers should degrade to
- * "everything on one page" rather than crash on a missing `recipes`.
+ * Coerces a listing response into the paged shape the UI renders. A bare array
+ * means an API too old to page; `stale` says so in the UI.
  */
 export function normalizePage(data, { page = 1, limit = PAGE_SIZE } = {}) {
   if (Array.isArray(data)) {
-    // `stale` is surfaced in the UI. Degrading quietly here once cost two
-    // rounds of "search does nothing" — the old API ignores every query
-    // param, so the page flickers and returns the identical list.
     return { recipes: data, page: 1, pages: 1, total: data.length, limit, stale: true };
   }
   if (!data || !Array.isArray(data.recipes)) {

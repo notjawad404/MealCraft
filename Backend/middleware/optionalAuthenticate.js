@@ -1,11 +1,8 @@
 const jwt = require('jsonwebtoken');
 
 /**
- * Reads the token when one is sent, and carries on either way.
- *
- * For the routes that answer everybody but answer the owner differently. A
- * token that will not verify is treated as no token at all rather than as a
- * failure: the route does not require one, so there is nothing to refuse.
+ * Reads the token when one is sent, and carries on either way. An unverifiable
+ * token is treated as no token rather than as a failure.
  */
 module.exports = function optionalAuthenticate(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1];

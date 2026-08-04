@@ -18,84 +18,57 @@ const recipeSchema = mongoose.Schema({
         type: String,
         required: true
     },
-    // A Cloudinary delivery URL. Recipes written before the move to Cloudinary
-    // hold a base64 data URI here instead — both forms go straight into an
-    // `<img src>`, so readers do not have to care which they got, and
-    // scripts/migrateImagesToCloudinary.js converts the stragglers. Nothing
-    // writes a data URI any more: a new photo is uploaded as binary and only
-    // the URL comes back. See controller/recipeController.js.
+    // Cloudinary delivery URL, or a base64 data URI on pre-migration records.
     image:{
         type: String,
     },
-    // A much smaller copy of `image`: a cropped Cloudinary derivative, or on
-    // legacy documents a re-encoding the client made at upload time. Listings
-    // return this and omit `image` entirely, so a page of twenty recipes costs
-    // kilobytes rather than tens of megabytes.
+    // Cropped derivative of `image`. Listings return this instead of `image`.
     thumbnail:{
         type: String,
     },
-    // The Cloudinary asset behind the two URLs above, kept so the photo can be
-    // deleted when it is replaced or its recipe is. Empty on documents whose
-    // image is stored inline, which is exactly the test for which kind it is.
+    // The Cloudinary asset behind the URLs above. Empty for inline images.
     imagePublicId:{
         type: String,
         default: '',
     },
-    // Optional link to the recipe on video — YouTube for preference, Vimeo,
-    // Dailymotion or a direct video file otherwise. Vetted and rebuilt in
-    // canonical form by utils/videoUrl.js, which is what lets the frontend put
-    // the value into a player without trusting it.
+    // Canonical video link, vetted by utils/videoUrl.js.
     videoUrl:{
         type: String,
         default: '',
     },
-    // What the recipe contains, for anyone who has to avoid it. A mix of the
-    // known slugs in utils/recipeTags.js and whatever else the cook typed —
-    // free text is allowed here because only they know what is in it.
+    // Known slugs from utils/recipeTags.js mixed with free text.
     allergens:{
         type: [String],
         default: [],
     },
-    // The diets the recipe is suitable for: halal, kosher, vegan and so on.
-    // Closed vocabulary, checked in the controller against DIETS. The enum
-    // here covers direct writes; findByIdAndUpdate skips validators, which is
-    // why the controller does not lean on it.
+    // Closed vocabularies, also checked in the controller.
     diets:{
         type: [{ type: String, enum: DIETS }],
         default: [],
     },
-    // Which meals the recipe is for — a frittata is breakfast, brunch and lunch
-    // at once, so this is a list rather than one choice.
     mealTypes:{
         type: [{ type: String, enum: MEAL_TYPES }],
         default: [],
     },
-    // Where the food is from. Regions are a closed list; the countries beside
-    // them are free text, because no fixed country list settles quietly.
     regions:{
         type: [{ type: String, enum: REGIONS }],
         default: [],
     },
+    // Free text.
     countries:{
         type: [String],
         default: [],
     },
-    // How many the recipe makes. Everything nutritional below is *per serving*,
-    // and without this figure those numbers cannot be scaled to a pan.
     servings:{
         type: Number,
         default: null,
     },
-    // Per serving, and optional: null means the cook did not know, which is not
-    // the same as zero. Its own field rather than a nutrient row because it is
-    // the one figure worth putting on a card.
+    // Per serving. null means unknown, which is not zero.
     calories:{
         type: Number,
         default: null,
     },
-    // Everything else the cook knew, per serving. Free-form on purpose — the
-    // names in utils/nutrition.js are offered, not required, so a recipe can
-    // carry a nutrient this app has never heard of.
+    // Per serving, free-form names.
     nutrients:{
         type: [
             {
@@ -119,11 +92,7 @@ const recipeSchema = mongoose.Schema({
         type: Boolean,
         default: true,
     },
-    // Running totals of the rows in the recipeInteraction collection, which is
-    // where the answer really lives. They are kept here so a page of twenty
-    // cards can show its counts without twenty counting queries, and so a
-    // "most liked" sort has a field it can index. Moved by $inc in the same
-    // request that flips the flag — see controller/interactionController.js.
+    // Running totals of the rows in the recipeInteraction collection.
     likeCount: {
         type: Number,
         default: 0,

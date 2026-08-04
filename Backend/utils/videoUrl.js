@@ -1,25 +1,9 @@
-// The recipe's optional video link.
-//
-// A link is only accepted if its shape proves it points at a video: a known
-// host with a video id in the path, or a URL ending in a video file extension.
-// Everything else is refused. The alternative — fetching the URL to sniff its
-// content type — would mean this server making requests to arbitrary addresses
-// on a stranger's say-so, which is a worse problem than the one it solves.
-//
-// Links are stored rebuilt from the id rather than as pasted. That drops
-// playlist ids and tracking params, and — because the frontend puts this field
-// into an iframe src — means nothing but a known player URL can end up there.
-//
-// YouTube is the preferred source and the best supported: its player brings
-// quality, captions and playback speed with it. The others still play.
+// The recipe's optional video link. See docs/BACKEND.md.
 
 const MAX_URL_LENGTH = 500;
 const MAX_START_SECONDS = 24 * 60 * 60;
 
-// Extensions a browser can play from a plain <video> element. Streaming
-// manifests (.m3u8, .mpd) are deliberately absent — they need a player library
-// this app does not ship, so accepting one would only store a link that
-// silently fails to play.
+// Playable from a plain <video> element. Streaming manifests are excluded.
 const VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.webm', '.ogv', '.mov'];
 
 const reject = (message) => ({ ok: false, message });
@@ -40,8 +24,7 @@ const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
 // Paths carrying the id as their second segment: /shorts/ID, /embed/ID, …
 const YOUTUBE_ID_IN_PATH = new Set(['shorts', 'embed', 'live', 'v']);
 
-// The `t` param arrives as either plain seconds ("90", "90s") or YouTube's own
-// shorthand ("1h2m3s"), depending on which share button was used.
+// Plain seconds ("90", "90s") or YouTube shorthand ("1h2m3s").
 const TIMESTAMP = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/;
 
 function youtubeStart(url) {
@@ -83,12 +66,12 @@ function readYoutube(url, segments) {
 const VIMEO_HOSTS = new Set(['vimeo.com', 'www.vimeo.com', 'player.vimeo.com']);
 
 const VIMEO_ID = /^\d{6,12}$/;
-// Unlisted videos carry a privacy hash after the id, without which they 404.
+// Privacy hash carried by unlisted videos.
 const VIMEO_HASH = /^[A-Za-z0-9]{6,16}$/;
 
 function readVimeo(url, segments) {
     const path = segments[0] === 'video' ? segments.slice(1) : segments;
-    // /channels/staffpicks/12345678 and friends put the id last, not first.
+    // /channels/staffpicks/12345678 puts the id last, not first.
     const index = path.findIndex((segment) => VIMEO_ID.test(segment));
     if (index === -1) {
         return reject('That Vimeo link does not point at a video.');
@@ -110,8 +93,8 @@ const DAILYMOTION_ID = /^[a-zA-Z0-9]{5,12}$/;
 
 function readDailymotion(url, segments) {
     const path = segments[0] === 'video' || segments[0] === 'embed' ? segments.slice(1) : segments;
-    const raw = (path[0] === 'video' ? path[1] : path[0]) ?? '';
     // Share links append a title slug: x8abcde_lemon-roast-chicken.
+    const raw = (path[0] === 'video' ? path[1] : path[0]) ?? '';
     const id = raw.split('_')[0];
 
     if (!DAILYMOTION_ID.test(id)) {
@@ -134,14 +117,12 @@ function readFile(url) {
         );
     }
 
-    // The site is served over https, so an http video would be blocked as
-    // mixed content and simply never appear — better to say so now.
+    // An http video would be blocked as mixed content.
     if (url.protocol !== 'https:') {
         return reject('A direct video link has to be https, or browsers will refuse to play it.');
     }
 
-    // Kept whole: unlike the providers there is no id to rebuild it from, and
-    // signed or expiring links carry their credentials in the query string.
+    // Kept whole: there is no id to rebuild the URL from.
     return { ok: true, provider: 'file', videoId: null, url: url.toString() };
 }
 
@@ -164,8 +145,7 @@ function normalizeVideoUrl(value) {
 
     let url;
     try {
-        // A link copied out of the address bar sometimes arrives without its
-        // scheme; assume https rather than bouncing it back over that.
+        // A missing scheme is assumed to be https.
         url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`);
     } catch {
         return reject('That does not look like a link.');

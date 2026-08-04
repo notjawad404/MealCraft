@@ -21,7 +21,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Where the guard sent us from, so "Share a recipe" resumes after signing in.
+  // Where the route guard sent us from, so the journey resumes after signing in.
   const redirectTo = location.state?.from?.pathname || '/';
 
   const [values, setValues] = useState({ email: '', password: '' });

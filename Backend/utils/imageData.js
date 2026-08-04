@@ -1,28 +1,12 @@
-/**
- * Vetting for an uploaded recipe photo.
- *
- * Photos arrive as binary multipart, are checked here, and go straight to
- * Cloudinary as bytes — base64 is not involved at any point. It used to be:
- * the image was encoded to a data URI, posted as a JSON field and stored on
- * the recipe document. That cost a third more bytes on the wire for the
- * encoding alone, and put the whole picture inside every read of the recipe.
- *
- * The client downscales and re-encodes before sending, which is where the real
- * size control happens (Frontend/src/lib/image.js). This is the backstop for
- * anything that did not come through the form.
- */
+/** Vetting for an uploaded recipe photo. See docs/BACKEND.md. */
 const MAX_IMAGE_BYTES = 1024 * 1024;
 
-// Recipes written before the move to Cloudinary can hold an inline base64
-// image up to the old, laxer ceiling. Nothing accepts a new upload that large,
-// but scripts/migrateImagesToCloudinary.js still has to be able to read one.
+// Ceiling for legacy inline images, read only by the migration script.
 const MAX_LEGACY_IMAGE_BYTES = 2 * 1024 * 1024;
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-// The declared type comes from the client, so it is checked against the file's
-// actual leading bytes. Without this the upload would happily forward any blob
-// at all under an `image/png` label.
+// Leading bytes per type, checked against the client's declared type.
 const SIGNATURES = {
     'image/jpeg': (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
     'image/png': (b) =>
@@ -40,7 +24,7 @@ const formatSize = (bytes) =>
 const reject = (message) => ({ ok: false, message });
 
 /**
- * Check the bytes of an uploaded image against the type it claims to be.
+ * Check an uploaded image's bytes against the type it claims to be.
  *
  * @param {Buffer} buffer
  * @param {string} declaredType  the multipart part's Content-Type
@@ -61,8 +45,7 @@ function inspectImageBuffer(buffer, declaredType, { maxBytes = MAX_IMAGE_BYTES }
         return reject(`Image is too large (${formatSize(buffer.length)}). The limit is ${formatSize(maxBytes)}.`);
     }
 
-    // Shorter than any real header, so the signature check below would read
-    // past the end of the buffer rather than simply failing.
+    // Shorter than any real header, so the signature check cannot run.
     if (buffer.length < 12 || !SIGNATURES[mime](buffer)) {
         return reject(`That does not look like a real ${mime.replace('image/', '')} image.`);
     }

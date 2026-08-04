@@ -2,13 +2,10 @@ import { useEffect, useRef } from 'react';
 import FormAlert from './FormAlert';
 
 /**
- * A yes/no question over whatever the user was looking at, for the actions that
- * cannot be undone.
+ * A yes/no question for actions that cannot be undone. Built on <dialog>.
  *
- * Built on <dialog>, which brings the focus trap, the escape key and the inert
- * background with it. `onConfirm` is expected to do the work
- * and the caller keeps `pending` and `error` — the dialog stays open and shows
- * the message when something fails, rather than closing over a failure.
+ * The caller owns `pending` and `error`, so the dialog stays open over a
+ * failure rather than closing on one.
  */
 export default function ConfirmDialog({
   open,
@@ -33,8 +30,7 @@ export default function ConfirmDialog({
   return (
     <dialog
       ref={dialogRef}
-      // Escape while the work is in flight would leave the user watching
-      // nothing, so it is refused until the request settles.
+      // Escape is refused until the request settles.
       onCancel={(e) => {
         if (pending) e.preventDefault();
       }}
@@ -59,8 +55,7 @@ export default function ConfirmDialog({
         <FormAlert>{error}</FormAlert>
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          {/* Focused on open, so a stray Return backs out rather than
-              confirming the one action here that cannot be undone. */}
+          {/* Focused on open, so a stray Return cancels rather than confirms. */}
           <button
             type="button"
             onClick={onClose}

@@ -1,9 +1,6 @@
 import { Link } from 'react-router-dom';
 
-/**
- * MealCraft mark + wordmark, drawn inline as SVG so the app ships no image
- * assets — crisp at any size, one less request, and it inherits the theme.
- */
+/** MealCraft mark and wordmark, drawn inline as SVG. */
 export default function Brand({ to = '/', className = '', invert = false }) {
   const content = (
     <span className={`inline-flex items-center gap-3 ${className}`}>

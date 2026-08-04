@@ -7,7 +7,7 @@ import FormAlert from '../common/FormAlert';
 import SubmitButton from '../common/SubmitButton';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8; // mirrors the backend's express-validator rule
+const MIN_PASSWORD_LENGTH = 8; // mirrors the API
 
 function validate({ name, email, password }) {
   const errors = {};

@@ -26,7 +26,7 @@ import NutritionInput from './NutritionInput';
 import VideoPlayer from './VideoPlayer';
 
 const MAX_TITLE = 120;
-const MAX_MINUTES = 2880; // two days, which covers proving, curing and brining
+const MAX_MINUTES = 2880;
 
 const emptyRecipe = {
   title: '',
@@ -42,15 +42,13 @@ const emptyRecipe = {
   calories: '',
   nutrients: [],
   videoUrl: '',
-  // `image` is the photo the recipe already has, as a Cloudinary URL. `photo`
-  // is a newly picked one, still a Blob — it is uploaded with the save rather
-  // than beforehand, so abandoning the form leaves nothing behind.
+  // `image` is the stored URL; `photo` is a newly picked Blob, uploaded on save.
   image: '',
   photo: null,
   isPublic: true,
 };
 
-/** A whole number, or null when the box is empty. NaN means "not a number". */
+/** A whole number, null when empty, NaN when unparsable. */
 const wholeNumber = (value) => {
   const trimmed = String(value ?? '').trim();
   if (!trimmed) return null;
@@ -58,11 +56,7 @@ const wholeNumber = (value) => {
   return Number.isInteger(number) ? number : NaN;
 };
 
-/**
- * Rows come off the form with the nutrient named as it is written on screen;
- * the API stores the known ones under their slug. Blank rows are dropped —
- * the editor always keeps an empty one at the bottom.
- */
+/** Form rows to API rows: labels become slugs, blank rows are dropped. */
 const packNutrients = (rows) =>
   rows
     .filter((row) => row.name.trim() && String(row.amount).trim())
@@ -74,7 +68,7 @@ const packNutrients = (rows) =>
       return { name: known ? known.value : name, amount: Number(row.amount), unit: row.unit };
     });
 
-/** And back again, for an edit: slugs become the wording the picker offers. */
+/** And back again, for an edit. */
 const unpackNutrients = (nutrients = []) =>
   nutrients.map(({ name, amount, unit }) => ({
     name: nutrientLabel(name),
@@ -120,21 +114,17 @@ function validate(values) {
     errors.nutrients = 'Amounts have to be numbers.';
   }
 
-  // Optional, but a link that is there and wrong is worth catching here rather
-  // than after the round trip.
   if (videoUrl.trim() && !parseVideoUrl(videoUrl)) {
     errors.videoUrl = 'Paste a YouTube, Vimeo or Dailymotion link, or a direct .mp4 or .webm file.';
   }
 
-  // The badge is what someone with an allergy reads, so it is not allowed to
-  // contradict the allergens listed right above it.
   const conflict = findDietConflict(values.diets, values.allergens);
   if (conflict) errors.diets = conflict;
 
   return errors;
 }
 
-/** Labelled wrapper shared by the plain inputs on this form. */
+/** Labelled wrapper for the plain inputs on this form. */
 function Row({ id, label, hint, error, children }) {
   return (
     <div>
@@ -155,11 +145,7 @@ function Row({ id, label, hint, error, children }) {
   );
 }
 
-/**
- * The form runs to five screens now, so it is broken into named parts. Only the
- * first is required; the rest are things a cook fills in if they happen to know
- * them, and the headings are what makes that skippability visible.
- */
+/** One titled group of fields. Only the first section is required. */
 function Section({ title, blurb, children }) {
   return (
     <section className="space-y-8 border-t border-ink-200 pt-10 first:border-0 first:pt-0 dark:border-night-600">
@@ -177,11 +163,10 @@ function Section({ title, blurb, children }) {
 }
 
 /**
- * The recipe editor. Kept separate from the page so an edit route can reuse it
- * later with `initialValues` filled in.
+ * The recipe editor, shared by the add and edit pages.
  *
- * `onSubmit` receives a payload shaped for the API and may throw; the thrown
- * message is surfaced in the banner and the form stays filled in.
+ * `onSubmit` receives an API-shaped payload and may throw; the thrown message
+ * is surfaced in the banner and the form stays filled in.
  */
 export default function RecipeForm({
   initialValues,
@@ -224,13 +209,10 @@ export default function RecipeForm({
     try {
       await onSubmit({
         title: values.title.trim(),
-        // The schema stores this as one string; one ingredient per line keeps
-        // it splittable again on the way back out.
         ingredients: values.ingredients.map((line) => line.trim()).filter(Boolean).join('\n'),
         instructions: values.instructions.trim(),
         time: String(Number(values.time)),
-        // Everything below is sent even when empty, so clearing a field on an
-        // edit actually clears it.
+        // Sent even when empty, so clearing a field on an edit clears it.
         servings: wholeNumber(values.servings),
         mealTypes: values.mealTypes,
         regions: values.regions,
@@ -240,9 +222,6 @@ export default function RecipeForm({
         calories: wholeNumber(values.calories),
         nutrients: packNutrients(values.nutrients),
         videoUrl: values.videoUrl.trim(),
-        // Empty rather than omitted, for the same reason: on an edit, a removed
-        // photo has to reach the API as a cleared field, not as silence. A new
-        // photo overrides this server-side, so it is sent either way.
         image: values.image,
         isPublic: values.isPublic,
       }, values.photo);

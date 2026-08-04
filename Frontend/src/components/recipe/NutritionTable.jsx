@@ -1,12 +1,6 @@
 import { nutrientLabel } from '../../lib/recipes';
 
-/**
- * The per-serving figures, as far as the cook knew them.
- *
- * Nothing is filled in or inferred: a nutrient that is not listed is simply
- * absent, and the note at the bottom says so. Printing a zero for an unknown
- * would be the one genuinely misleading thing this panel could do.
- */
+/** The per-serving figures. Nothing is inferred; unlisted means absent. */
 export default function NutritionTable({ calories, nutrients = [], servings }) {
   if (calories === null && nutrients.length === 0) return null;
 

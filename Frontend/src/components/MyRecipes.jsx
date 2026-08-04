@@ -5,15 +5,14 @@ import { recipeApi } from '../lib/api';
 import PageHeader from './common/PageHeader';
 import RecipeBrowser from './recipe/RecipeBrowser';
 
-/** The signed-in user's own recipes — the private ones included. */
+/** The signed-in user's own recipes, private ones included. */
 export default function MyRecipes() {
   const { user, token } = useAuth();
 
   const fetchPage = useCallback((options) => recipeApi.mine(token, options), [token]);
   const fetchSuggestions = useCallback((options) => recipeApi.suggestMine(token, options), [token]);
 
-  // What the owner's controls on each card actually do. The browser decides
-  // what each one means for the list it is showing.
+  // What the owner's controls on each card do; RecipeBrowser owns the list.
   const manage = useMemo(
     () => ({
       editPath: (recipe) => `/recipes/${recipe._id}/edit`,

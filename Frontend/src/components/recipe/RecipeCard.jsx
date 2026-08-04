@@ -13,14 +13,12 @@ import ConfirmDialog from '../common/ConfirmDialog';
 const TAG_LIMIT = 4;
 const BADGE_LIMIT = 3;
 
-// The owner's controls. `relative z-10` on every one of them is load-bearing:
-// the title's stretched link covers the whole card, and anything meant to be
-// clicked in its own right has to sit above it.
+// `relative z-10` lifts these above the title's stretched link.
 const CARD_ACTION =
   'relative z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold' +
   ' transition-colors disabled:pointer-events-none disabled:opacity-50';
 
-/** Stand-in for recipes saved without a photo — the app ships no image assets. */
+/** Stand-in for recipes saved without a photo. */
 function Placeholder() {
   return (
     <div className="relative grid h-44 place-items-center overflow-hidden bg-gradient-to-br from-ember-400 via-ember-500 to-ember-700">
@@ -35,10 +33,8 @@ function Placeholder() {
 /**
  * One recipe, as a card.
  *
- * `manage` turns on the owner's controls — edit, delete, and the visibility
- * badge as a switch. It is `{ editPath, onDelete, onVisibilityChange }`; the
- * last two do the work and may throw, and whatever they change about the
- * listing is the caller's business.
+ * `manage` is `{ editPath, onDelete, onVisibilityChange }` and turns on the
+ * owner's controls. The two handlers may throw.
  */
 export default function RecipeCard({ recipe, showVisibility = false, manage = null }) {
   const location = useLocation();
@@ -51,8 +47,7 @@ export default function RecipeCard({ recipe, showVisibility = false, manage = nu
   const extra = allIngredients.length - tags.length;
 
   const origin = describeOrigin(recipe);
-  // Meal types and diets share one row, since a card has room for one. Diets
-  // go first: they are the ones someone is filtering for by eye.
+  // Diets and meal types share one row, diets first.
   const badges = [
     ...(recipe.diets ?? []).map((value) => ({ key: `d-${value}`, label: dietLabel(value), diet: true })),
     ...(recipe.mealTypes ?? []).map((value) => ({ key: `m-${value}`, label: mealTypeLabel(value), diet: false })),
@@ -86,12 +81,9 @@ export default function RecipeCard({ recipe, showVisibility = false, manage = nu
     setActionError('');
     try {
       await manage.onDelete();
-      // On success the refreshed listing takes this card with it, so there is
-      // nothing left here to put back in order.
       setConfirming(false);
     } catch (err) {
-      // The dialog stays open over a failure, so the reason sits next to the
-      // button that was pressed and a second try is one click away.
+      // The dialog stays open over a failure so the reason stays visible.
       setActionError(err.message);
     } finally {
       setBusy('');
@@ -132,9 +124,7 @@ export default function RecipeCard({ recipe, showVisibility = false, manage = nu
 
           {showVisibility &&
             (canToggleVisibility ? (
-              // The badge is the switch — the thing it describes is the thing
-              // you press. `aria-pressed` says which way it is set; the label
-              // says what pressing it would do.
+              // The badge doubles as the switch.
               <button
                 type="button"
                 onClick={toggleVisibility}
@@ -173,14 +163,8 @@ export default function RecipeCard({ recipe, showVisibility = false, manage = nu
           )}
 
           <h3 className="font-display text-lg font-semibold leading-snug text-ink-900 dark:text-paper-50">
-            {/* Stretched over the whole card, so the click target is the card
-                while the accessibility tree still holds one plain link. The
-                ring is drawn by the article's focus-within, since the link
-                itself is only as big as its text.
-
-                Where the card is sitting travels with it, so the page can send
-                the reader back to this listing with its search and filters
-                still on. */}
+            {/* Stretched over the whole card. `state.from` carries the listing
+                URL so the detail page can send the reader back to it. */}
             <Link
               to={`/recipes/${recipe._id}`}
               state={{ from: `${location.pathname}${location.search}` }}
@@ -263,8 +247,7 @@ export default function RecipeCard({ recipe, showVisibility = false, manage = nu
           )}
 
           {manage && (
-            // `mt-auto` keeps this on the floor of the card, so the row lines
-            // up across a grid of cards that are not the same height.
+            // `mt-auto` lines this row up across cards of differing heights.
             <div className="mt-auto pt-4">
               <div className="flex items-center gap-1 border-t border-ink-100 pt-3 dark:border-night-700">
                 <Link
@@ -302,8 +285,7 @@ export default function RecipeCard({ recipe, showVisibility = false, manage = nu
         </div>
       </article>
 
-      {/* Mounted only while it is being asked, so twenty cards do not mean
-          twenty dialogs sitting in the document. */}
+      {/* Mounted only while it is open. */}
       {confirming && (
         <ConfirmDialog
           open={confirming}

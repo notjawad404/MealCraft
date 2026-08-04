@@ -47,8 +47,7 @@ export default function AddRecipe() {
   const { user, token } = useAuth();
   const [saved, setSaved] = useState(null);
 
-  // Errors are thrown back for RecipeForm to show in its banner, so the
-  // filled-in form survives a failed save.
+  // Thrown errors are left for RecipeForm's banner.
   const handleSubmit = async (payload, photo) => {
     const recipe = await recipeApi.create({ ...payload, username: user.name }, token, photo);
     setSaved(recipe);

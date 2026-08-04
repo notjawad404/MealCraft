@@ -4,7 +4,7 @@ import { recipeApi } from '../lib/api';
 import PageHeader from './common/PageHeader';
 import RecipeBrowser from './recipe/RecipeBrowser';
 
-/** Everything anyone has chosen to publish. Open to signed-out visitors. */
+/** Every published recipe. Open to signed-out visitors. */
 export default function Recipes() {
   const fetchPage = useCallback((options) => recipeApi.list(options), []);
   const fetchSuggestions = useCallback((options) => recipeApi.suggest(options), []);

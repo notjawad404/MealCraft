@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/**
- * Trails `value` by `delay`, so typing in a search box does not fire a request
- * per keystroke.
- */
+/** Trails `value` by `delay`. */
 export default function useDebouncedValue(value, delay = 350) {
   const [debounced, setDebounced] = useState(value);
 

@@ -8,7 +8,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Warm paper neutrals — the light-mode canvas.
+        // Light-mode canvas.
         paper: {
           50:  '#FCF9F4',
           100: '#F7F1E8',
@@ -16,7 +16,7 @@ export default {
           300: '#E2D4C0',
           400: '#C9B79D',
         },
-        // Warm greys for text and hairlines.
+        // Text and hairlines.
         ink: {
           50:  '#F8F4EE',
           100: '#F0E9DF',
@@ -29,7 +29,7 @@ export default {
           800: '#241D18',
           900: '#17130F',
         },
-        // Paprika / terracotta accent.
+        // Primary accent.
         ember: {
           50:  '#FDF2EE',
           100: '#FBE1D8',
@@ -42,7 +42,7 @@ export default {
           800: '#762C18',
           900: '#5F2615',
         },
-        // Herb green, used sparingly as a second voice.
+        // Secondary accent.
         sage: {
           100: '#E8EDE2',
           300: '#B4C2A4',
@@ -86,8 +86,7 @@ export default {
           '0%, 100%': { transform: 'translateY(0) rotate(var(--tw-rotate, 0deg))' },
           '50%':      { transform: 'translateY(-12px) rotate(var(--tw-rotate, 0deg))' },
         },
-        // Indeterminate loading bar — it sweeps rather than filling, because
-        // there is no meaningful percentage to report.
+        // Indeterminate loading bar.
         progress: {
           '0%':   { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(400%)' },

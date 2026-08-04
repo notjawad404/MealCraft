@@ -1,11 +1,8 @@
 import { useRef } from 'react';
 
-/**
- * One row per ingredient. The backend stores `ingredients` as a single string,
- * so the rows are joined with newlines on submit — see RecipeForm.
- */
+/** One row per ingredient; RecipeForm joins them with newlines on submit. */
 export default function IngredientsInput({ values, onChange, error, disabled }) {
-  // Focus the row that was just added, so a keyboard user keeps typing.
+  // Focus the row just added.
   const focusIndex = useRef(null);
 
   const setAt = (index, next) =>
@@ -19,7 +16,7 @@ export default function IngredientsInput({ values, onChange, error, disabled }) 
   const removeRow = (index) =>
     onChange(values.length === 1 ? [''] : values.filter((_, i) => i !== index));
 
-  // Enter would otherwise submit the form; here it means "next ingredient".
+  // Enter adds the next row rather than submitting the form.
   const onKeyDown = (index) => (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -33,8 +30,7 @@ export default function IngredientsInput({ values, onChange, error, disabled }) 
 
       <ul className="space-y-2">
         {values.map((value, index) => (
-          // Rows have no stable id of their own; reordering is not possible
-          // here, so the index is a safe key.
+          // Rows have no id and cannot be reordered, so the index is safe.
           <li key={index} className="flex items-center gap-2">
             <span
               aria-hidden="true"

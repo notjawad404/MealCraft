@@ -10,17 +10,8 @@ const clamp = (value, max) => Math.min(Math.max(value, 0), max || 0);
 const percent = (value, total) => (total > 0 ? `${(value / total) * 100}%` : '0%');
 
 /**
- * A recipe video that is a plain file rather than a provider's page, played
- * through <video> with controls of our own.
- *
- * The element is the single source of truth: every action writes to it and the
- * state below is only a mirror kept up to date by its events. That is what
- * keeps the bar honest when something else moves the video — the keyboard, the
- * OS media keys, or the browser's own picture-in-picture window.
- *
- * There is no quality control here: one file is one encoding, and switching
- * between renditions needs a streaming manifest and a player library to read
- * it. Provider embeds have their own quality menu.
+ * A direct video file, played through <video> with our own controls. The element
+ * is the source of truth; the state below mirrors it. See docs/FRONTEND.md.
  */
 export default function FileVideo({ src, title, theater, onToggleTheater, fullscreen, onToggleFullscreen }) {
   const videoRef = useRef(null);
@@ -41,8 +32,6 @@ export default function FileVideo({ src, title, theater, onToggleTheater, fullsc
   const [speedOpen, setSpeedOpen] = useState(false);
   const [idle, setIdle] = useState(false);
 
-  // Hiding the bar over a paused video just makes it look broken, and hiding it
-  // out from under an open menu makes it unusable.
   const controlsShown = !idle || !playing || speedOpen;
 
   const wake = useCallback(() => {
@@ -53,7 +42,7 @@ export default function FileVideo({ src, title, theater, onToggleTheater, fullsc
 
   useEffect(() => () => clearTimeout(hideTimer.current), []);
 
-  /* ---- Actions. All of them write to the element, never to state. ---- */
+  /* ---- Actions: all write to the element, never to state ---- */
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
@@ -93,14 +82,11 @@ export default function FileVideo({ src, title, theater, onToggleTheater, fullsc
     setCaptionsOn(next);
   };
 
-  /* ---- Keyboard, the same shortcuts every video player uses. ---- */
+  /* ---- Keyboard ---- */
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      // Anything focusable keeps its own keys: space belongs to a focused
-      // button, and the arrows belong to a focused slider. What is left is the
-      // page itself, the dialog, and the video — which is focusable precisely
-      // so that clicking it turns these shortcuts on.
+      // Focusable elements keep their own keys.
       if (event.target.closest?.('input, textarea, select, button, a, [contenteditable]')) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
@@ -128,7 +114,7 @@ export default function FileVideo({ src, title, theater, onToggleTheater, fullsc
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [togglePlay, skip, toggleMute, onToggleFullscreen, onToggleTheater, wake]);
 
-  /* ---- Mirroring the element's state ---- */
+  /* ---- Mirroring the element ---- */
 
   const readBuffered = (video) => {
     const ranges = video.buffered;
@@ -139,8 +125,7 @@ export default function FileVideo({ src, title, theater, onToggleTheater, fullsc
     const video = event.currentTarget;
     setDuration(Number.isFinite(video.duration) ? video.duration : 0);
 
-    // Subtitles shipped inside the file, if there happen to be any. Most
-    // recipe videos have none, and then the button simply does not appear.
+    // Subtitles shipped inside the file, if any; the button hides without them.
     const tracks = Array.from(video.textTracks).filter(
       (track) => track.kind === 'subtitles' || track.kind === 'captions',
     );
@@ -209,7 +194,7 @@ export default function FileVideo({ src, title, theater, onToggleTheater, fullsc
         </div>
       )}
 
-      {/* The one big target, for a video that is not currently running. */}
+      {/* The big play target, for a video that is not running. */}
       {!playing && !waiting && (
         <button
           type="button"
@@ -249,8 +234,7 @@ export default function FileVideo({ src, title, theater, onToggleTheater, fullsc
           <ControlButton label={`Back ${SKIP_SECONDS} seconds`} icon="back" onClick={() => skip(-SKIP_SECONDS)} />
           <ControlButton label={`Forward ${SKIP_SECONDS} seconds`} icon="forward" onClick={() => skip(SKIP_SECONDS)} />
 
-          {/* The slider slides out on hover so the bar stays uncluttered, but
-              it is always in the tab order — it is not hidden, only narrow. */}
+          {/* Slides out on hover or focus; never removed from the tab order. */}
           <div className="group flex items-center">
             <ControlButton label={muted ? 'Unmute' : 'Mute'} icon={muted || volume === 0 ? 'muted' : 'volume'} onClick={toggleMute} />
             <input

@@ -1,50 +1,29 @@
 /**
- * Prepares a picked file for upload: downscaled, re-encoded, and handed back as
- * a Blob ready to be posted as binary multipart.
- *
- * Nothing here produces base64. The file used to be read into a data URI and
- * posted as a JSON field, which cost a third more bytes on the wire for the
- * encoding alone; the canvas gives us a Blob directly, and that Blob is what
- * goes to the server and on to Cloudinary.
- *
- * Two other things fall out of re-encoding rather than uploading the original:
- * the EXIF block goes, which on a phone photo says where it was taken, and the
- * 4-8 MP a modern camera produces is cut down to something a recipe page can
- * actually use. A photo is never drawn larger than a card or a detail header.
+ * Prepares a picked file for upload: downscaled, re-encoded, and returned as a
+ * Blob. See docs/FRONTEND.md.
  */
 
 export const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-// Refuse absurd source files up front rather than spending seconds decoding a
-// 60 MP photo only to throw the result away.
 const MAX_SOURCE_BYTES = 12 * 1024 * 1024;
 
-// The longest edge we keep. The detail view draws a photo at most ~30rem tall
-// across a content column, so 1280 still has pixels in hand on a 2x display,
-// and Cloudinary's delivery transform never asks for more than 1600.
+// The longest edge kept.
 const MAX_EDGE = 1280;
 
-// What the encoder aims for. A target, not a limit: an image that will not
-// compress this far is kept at the best quality that fits MAX_ENCODED_BYTES
-// rather than being ground down to meet a number.
+// What the encoder aims for; MAX_ENCODED_BYTES is the hard ceiling.
 const TARGET_BYTES = 300 * 1024;
 
-// The hard ceiling. Must stay at or below the backend's MAX_IMAGE_BYTES
-// (Backend/utils/imageData.js), which multer also enforces on the way in.
+// Must stay at or below the backend's MAX_IMAGE_BYTES.
 const MAX_ENCODED_BYTES = 1024 * 1024;
 
 // Only reached by an image that will not meet the target at full size.
 const EDGE_STEPS = [MAX_EDGE, 1024, 800];
 
-// WebP's quality scale is not JPEG's: 0.8 here is roughly JPEG 0.9 to the eye
-// at about two thirds the bytes, which is the single biggest saving available.
 const QUALITY = {
   'image/webp': { max: 0.8, min: 0.45 },
   'image/jpeg': { max: 0.85, min: 0.5 },
 };
 
-// Each step halves the remaining quality range, so five gets within ~1% of the
-// best quality that fits. Every step is one encode, hence not more.
 const QUALITY_SEARCH_STEPS = 5;
 
 export class ImageError extends Error {
@@ -60,9 +39,7 @@ export function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// Safari only learned to encode WebP in 14, and canvas silently falls back to
-// PNG rather than failing, so the result has to be inspected rather than
-// trusted. Asked once and remembered — it cannot change mid-session.
+// Probed rather than assumed: canvas falls back to PNG instead of failing.
 let webpSupport = null;
 function encodeFormat() {
   if (webpSupport === null) {
@@ -86,8 +63,6 @@ function loadImage(file) {
       URL.revokeObjectURL(url);
       reject(new ImageError('That file is not an image we can read.'));
     };
-    // An object URL rather than a FileReader data URI: the browser decodes
-    // straight from the file instead of building a base64 copy of it first.
     img.src = url;
   });
 }
@@ -102,14 +77,7 @@ function newCanvas(width, height) {
   return { canvas, ctx };
 }
 
-/**
- * Scale down to fit `maxEdge`, halving on the way.
- *
- * One 4000px-to-1280px drawImage samples a fraction of the source pixels and
- * leaves stair-stepped edges — which then cost bytes to encode, because sharp
- * noise is exactly what a lossy codec spends bits on. Halving repeatedly
- * averages every pixel in, so the result is both cleaner and smaller.
- */
+/** Scale down to fit `maxEdge`, halving on the way. */
 function downscale(img, maxEdge) {
   const longest = Math.max(img.naturalWidth, img.naturalHeight);
   const scale = Math.min(1, maxEdge / longest);
@@ -132,7 +100,7 @@ function downscale(img, maxEdge) {
   return final.canvas;
 }
 
-/** JPEG has no alpha, so a transparent PNG would otherwise come out on black. */
+/** Flatten onto white, since JPEG has no alpha channel. */
 function flatten(source) {
   const { canvas, ctx } = newCanvas(source.width, source.height);
   ctx.fillStyle = '#ffffff';
@@ -151,13 +119,7 @@ function canvasToBlob(canvas, type, quality) {
   });
 }
 
-/**
- * The highest quality whose encoded size fits `budget`, found by bisection.
- *
- * Measured on the Blob itself, so the numbers are the real encoded bytes rather
- * than an estimate off a base64 string. Most photos never get past the first
- * line — at 1280px, WebP 0.8 is usually already inside the budget.
- */
+/** The highest quality whose encoded size fits `budget`, found by bisection. */
 async function encodeWithinBudget(canvas, type, budget) {
   const { max, min } = QUALITY[type];
 
@@ -205,9 +167,7 @@ export async function optimizeImage(file) {
 
   const img = await loadImage(file);
 
-  // A GIF goes up exactly as it is: re-encoding one through a canvas would
-  // flatten it to its first frame, and losing the animation is a worse outcome
-  // than sending a few more kilobytes.
+  // Sent as-is: a canvas re-encode would flatten it to its first frame.
   if (file.type === 'image/gif') {
     if (file.size > MAX_ENCODED_BYTES) {
       throw new ImageError(
@@ -245,15 +205,11 @@ export async function optimizeImage(file) {
       };
     }
 
-    // Over target even at the lowest quality this size allows. A smaller
-    // picture encoded well beats a bigger one encoded badly, so try the next
-    // size down before settling.
+    // Over target even at this size's lowest quality; try the next size down.
     smallest = canvas;
   }
 
-  // Nothing hit the target at any size — fine texture and noise do this. Give
-  // the smallest rendering the best quality that still fits the hard ceiling,
-  // rather than degrading it further to meet a number that was only a target.
+  // Nothing hit the target, so settle for the hard ceiling.
   const { blob } = await encodeWithinBudget(smallest, type, MAX_ENCODED_BYTES);
   if (blob.size > MAX_ENCODED_BYTES) {
     throw new ImageError('That image will not compress small enough. Try a different one.');

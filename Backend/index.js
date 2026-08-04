@@ -6,18 +6,14 @@ const errorHandler = require('./middleware/errorHandler.js');
 
 dotenv.config();
 
-// Overriding the resolver only makes sense on a developer machine, where a
-// stopped Docker/VPN resolver breaks SRV lookups. On Vercel the platform
-// resolver is the only one that works, so never touch it there.
+// Local-only DNS override; the platform resolver is the only one on Vercel.
 if (process.env.DNS_SERVERS && !process.env.VERCEL) {
     require('dns').setServers(process.env.DNS_SERVERS.split(',').map((s) => s.trim()));
 }
 
 const app = express();
 
-// Browsers send Origin with no trailing slash and lowercase the scheme/host,
-// so both sides get normalised. Pasting a URL straight from the address bar
-// ("https://example.com/") is otherwise an invisible mismatch.
+// Both sides are normalised so a trailing slash or casing cannot mismatch.
 const normaliseOrigin = (origin) => origin.trim().replace(/\/+$/, '').toLowerCase();
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
@@ -33,17 +29,14 @@ if (!allowedOrigins.length) {
 
 const corsOptions = {
     origin(origin, callback) {
-        // No Origin header at all: curl, health checks, server-to-server. These
-        // are not browser requests, so CORS has nothing to protect.
+        // No Origin header: not a browser request.
         if (!origin) return callback(null, true);
 
         if (allowAnyOrigin || !allowedOrigins.length) return callback(null, true);
 
         if (allowedOrigins.includes(normaliseOrigin(origin))) return callback(null, true);
 
-        // Refusing by omitting the header rather than throwing: the browser
-        // still blocks the response, but the caller gets the real status code
-        // instead of a 500 from the error handler.
+        // Refused by omitting the header, so the caller still sees its status.
         console.warn(`Blocked CORS origin: ${origin}`);
         callback(null, false);
     },
@@ -52,24 +45,17 @@ const corsOptions = {
     allowedHeaders: ["Content-Type", "Authorization"]
 };
 
-// cors() answers preflight OPTIONS itself, so no separate app.options() route.
-// Express 5 parses paths with path-to-regexp v8, where a bare "*" is a syntax
-// error that throws at startup and takes the whole app down with it.
+// cors() answers preflight OPTIONS itself; no app.options() route is needed.
 app.use(cors(corsOptions));
 
-// Recipe photos travel as binary multipart, handled by middleware/recipeUpload.js
-// on the two routes that take one. Nothing else this API accepts is large, so
-// the JSON ceiling only has to cover a long method and an ingredient list.
+// Photos go through middleware/recipeUpload.js, not this body parser.
 app.use(express.json({ limit: '512kb' }));
 
 app.get('/', (req, res) => {
     res.send('API is running...');
 });
 
-// Serverless invocations start with no open connection, and connecting at
-// module load would leave a crashed boot with no way to report why. Connecting
-// here keeps the failure inside the request, so the response still carries the
-// CORS headers the browser needs to surface the real error.
+// Connected per request, so a failure is answerable instead of a crashed boot.
 app.use(async (req, res, next) => {
     try {
         await connectDB();
@@ -91,8 +77,7 @@ app.use((req, res) => {
 
 app.use(errorHandler);
 
-// Vercel imports this file and calls the export per request; binding a port
-// there would hang the build. Locally we still want a real server.
+// Vercel imports the export instead; binding a port there would hang the build.
 if (!process.env.VERCEL) {
     const PORT = process.env.PORT || 5002;
     connectDB()
