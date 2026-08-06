@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
+import useLikes from '../hooks/useLikes';
 import { recipeApi } from '../lib/api';
 import {
   allergenLabel,
@@ -59,9 +60,12 @@ export default function RecipeDetail() {
   const location = useLocation();
   const navigate = useNavigate();
   const { token } = useAuth();
+  const { isLiked, toggleLike } = useLikes();
 
   const [state, setState] = useState({ recipe: null, error: '', pending: true });
   const [theater, setTheater] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [liking, setLiking] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -70,7 +74,10 @@ export default function RecipeDetail() {
     // The token is sent when there is one, or a private recipe 404s.
     recipeApi
       .get(id, { token, signal: controller.signal })
-      .then((recipe) => setState({ recipe, error: '', pending: false }))
+      .then((recipe) => {
+        setState({ recipe, error: '', pending: false });
+        setLikeCount(recipe?.likeCount ?? 0);
+      })
       .catch((err) => {
         if (controller.signal.aborted) return;
         setState({ recipe: null, error: err.message, pending: false });
@@ -80,6 +87,29 @@ export default function RecipeDetail() {
   }, [id, token]);
 
   const { recipe, error, pending } = state;
+  const liked = recipe ? isLiked(recipe._id) : false;
+
+  const handleLikeClick = async () => {
+    if (!recipe || liking) return;
+    setLiking(true);
+
+    try {
+      const result = await toggleLike(recipe._id);
+      if (result?.unauthenticated) {
+        navigate('/login', { state: { from: `${location.pathname}${location.search}` } });
+        return;
+      }
+      if (typeof result?.likeCount === 'number') {
+        setLikeCount(result.likeCount);
+      } else {
+        setLikeCount((prev) => (liked ? Math.max(0, prev - 1) : prev + 1));
+      }
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+    } finally {
+      setLiking(false);
+    }
+  };
 
   // A history step rather than a link, so the listing's scroll is restored.
   // Without `from` — a fresh tab — there is no history to step through.
@@ -139,9 +169,39 @@ export default function RecipeDetail() {
                   )}
                 </div>
 
-                <h1 className="mt-3 font-display text-4xl font-semibold leading-tight tracking-tight text-ink-900 dark:text-paper-50 sm:text-5xl">
-                  {recipe.title}
-                </h1>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
+                  <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight text-ink-900 dark:text-paper-50 sm:text-5xl">
+                    {recipe.title}
+                  </h1>
+
+                  <button
+                    type="button"
+                    onClick={handleLikeClick}
+                    disabled={liking}
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-75 ${
+                      liked
+                        ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-400'
+                        : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300 dark:border-night-700 dark:bg-night-800 dark:text-ink-200'
+                    }`}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={`h-5 w-5 transition-colors ${
+                        liked ? 'fill-red-500 text-red-500' : 'fill-none stroke-current'
+                      }`}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
+                    </svg>
+                    <span>{liked ? 'Liked' : 'Like'}</span>
+                    <span className="ml-0.5 rounded-full bg-ink-100 px-2.5 py-0.5 text-xs font-bold text-ink-800 dark:bg-night-700 dark:text-ink-200">
+                      {likeCount}
+                    </span>
+                  </button>
+                </div>
 
                 <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-500 dark:text-ink-400">
                   <Meta>

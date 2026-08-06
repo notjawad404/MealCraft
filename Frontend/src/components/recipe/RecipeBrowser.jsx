@@ -62,6 +62,7 @@ export default function RecipeBrowser({
   searchPlaceholder,
   showVisibility = false,
   manage = null,
+  removeOnUnlike = false,
 }) {
   const [params, setParams] = useSearchParams();
 
@@ -123,6 +124,9 @@ export default function RecipeBrowser({
 
   // Bumped after a delete to refetch the current page.
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Set of recipe IDs currently undergoing exit animation when unliked.
+  const [removingIds, setRemovingIds] = useState(() => new Set());
 
   const patchParams = (changes, options) =>
     setParams((previous) => {
@@ -219,6 +223,36 @@ export default function RecipeBrowser({
         setReloadKey((key) => key + 1);
       },
     };
+
+  const handleCardLikeToggle = (recipeId, isNowLiked) => {
+    if (removeOnUnlike && !isNowLiked) {
+      setRemovingIds((prev) => new Set(prev).add(recipeId));
+
+      setTimeout(() => {
+        setState((previous) => {
+          if (!previous.data) return previous;
+          const remaining = previous.data.recipes.filter((r) => r._id !== recipeId);
+          const newTotal = Math.max(0, (previous.data.total ?? 1) - 1);
+          const newPages = Math.max(1, Math.ceil(newTotal / (previous.data.limit || PAGE_SIZE)));
+          return {
+            ...previous,
+            data: {
+              ...previous.data,
+              recipes: remaining,
+              total: newTotal,
+              pages: newPages,
+            },
+          };
+        });
+
+        setRemovingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(recipeId);
+          return next;
+        });
+      }, 280);
+    }
+  };
 
   // Clamp a page number past the end back into range.
   const data = state.data;
@@ -340,6 +374,8 @@ export default function RecipeBrowser({
                     recipe={recipe}
                     showVisibility={showVisibility}
                     manage={manageRecipe(recipe)}
+                    onLikeToggle={handleCardLikeToggle}
+                    isRemoving={removingIds.has(recipe._id)}
                   />
                 ))}
               </div>

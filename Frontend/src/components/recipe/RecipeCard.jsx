@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import useLikes from '../../hooks/useLikes';
 import {
   allergenLabel,
   describeOrigin,
@@ -36,11 +37,58 @@ function Placeholder() {
  * `manage` is `{ editPath, onDelete, onVisibilityChange }` and turns on the
  * owner's controls. The two handlers may throw.
  */
-export default function RecipeCard({ recipe, showVisibility = false, manage = null }) {
+export default function RecipeCard({
+  recipe,
+  showVisibility = false,
+  manage = null,
+  onLikeToggle = null,
+  isRemoving = false,
+}) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isLiked, toggleLike } = useLikes();
+
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(''); // '' | 'visibility' | 'delete'
   const [actionError, setActionError] = useState('');
+
+  const [likeCount, setLikeCount] = useState(recipe.likeCount ?? 0);
+  const [liking, setLiking] = useState(false);
+
+  useEffect(() => {
+    setLikeCount(recipe.likeCount ?? 0);
+  }, [recipe.likeCount]);
+
+  const liked = isLiked(recipe._id);
+
+  const handleLikeClick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (liking) return;
+    setLiking(true);
+
+    try {
+      const result = await toggleLike(recipe._id);
+      if (result?.unauthenticated) {
+        navigate('/login', { state: { from: `${location.pathname}${location.search}` } });
+        return;
+      }
+      const isNowLiked = typeof result?.liked === 'boolean' ? result.liked : !liked;
+      if (typeof result?.likeCount === 'number') {
+        setLikeCount(result.likeCount);
+      } else {
+        setLikeCount((prev) => (isNowLiked ? prev + 1 : Math.max(0, prev - 1)));
+      }
+      if (onLikeToggle) {
+        onLikeToggle(recipe._id, isNowLiked, result);
+      }
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+    } finally {
+      setLiking(false);
+    }
+  };
 
   const allIngredients = splitIngredients(recipe.ingredients);
   const tags = allIngredients.slice(0, TAG_LIMIT);
@@ -93,10 +141,12 @@ export default function RecipeCard({ recipe, showVisibility = false, manage = nu
   return (
     <>
       <article
-        className="group relative flex flex-col overflow-hidden rounded-[1.5rem] border border-ink-200 bg-white
-                   shadow-card transition-shadow duration-300 hover:shadow-lift
+        className={`group relative flex flex-col overflow-hidden rounded-[1.5rem] border border-ink-200 bg-white
+                   shadow-card transition-all duration-300 hover:shadow-lift
                    focus-within:ring-2 focus-within:ring-ember-500 focus-within:ring-offset-2 focus-within:ring-offset-paper-50
-                   dark:border-night-600 dark:bg-night-800 dark:focus-within:ring-offset-night-900"
+                   dark:border-night-600 dark:bg-night-800 dark:focus-within:ring-offset-night-900 ${
+                     isRemoving ? 'animate-card-exit pointer-events-none' : ''
+                   }`}
       >
         <div className="relative">
           {recipe.thumbnail ? (
@@ -109,6 +159,34 @@ export default function RecipeCard({ recipe, showVisibility = false, manage = nu
           ) : (
             <Placeholder />
           )}
+
+          {/* Like Button */}
+          <button
+            type="button"
+            onClick={handleLikeClick}
+            disabled={liking}
+            aria-label={liked ? `Unlike recipe (${likeCount} likes)` : `Like recipe (${likeCount} likes)`}
+            title={liked ? 'Unlike recipe' : 'Like recipe'}
+            className="absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full border border-white/20 bg-paper-50/90 px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition-transform hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-75 dark:border-night-700/60 dark:bg-night-900/85"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-4 w-4 transition-colors ${
+                liked
+                  ? 'fill-red-500 text-red-500'
+                  : 'fill-none stroke-current text-ink-600 dark:text-paper-50'
+              }`}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
+            </svg>
+            <span className={liked ? 'font-bold text-red-600 dark:text-red-400' : 'text-ink-700 dark:text-paper-50'}>
+              {likeCount}
+            </span>
+          </button>
 
           {recipe.videoUrl && (
             <span
