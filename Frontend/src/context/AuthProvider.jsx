@@ -77,6 +77,22 @@ export default function AuthProvider({ children }) {
 
   const logout = useCallback(() => setSession(null), []);
 
+  const updateProfile = useCallback(
+    async (details) => {
+      const data = await authApi.updateProfile(details, session?.token);
+      setSession((prev) => (prev ? { ...prev, user: { ...prev.user, ...data.user } } : null));
+      return data.user;
+    },
+    [session?.token],
+  );
+
+  const changePassword = useCallback(
+    async (passwords) => {
+      return await authApi.changePassword(passwords, session?.token);
+    },
+    [session?.token],
+  );
+
   const value = useMemo(
     () => ({
       user: session?.user ?? null,
@@ -85,8 +101,10 @@ export default function AuthProvider({ children }) {
       login,
       register,
       logout,
+      updateProfile,
+      changePassword,
     }),
-    [session, login, register, logout],
+    [session, login, register, logout, updateProfile, changePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

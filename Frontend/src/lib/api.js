@@ -60,6 +60,9 @@ export async function apiRequest(path, { method = 'GET', body, token, signal } =
 export const authApi = {
   register: (payload) => apiRequest('/auth/register', { method: 'POST', body: payload }),
   login: (payload) => apiRequest('/auth/login', { method: 'POST', body: payload }),
+  getProfile: (token) => apiRequest('/auth/profile', { token }),
+  updateProfile: (payload, token) => apiRequest('/auth/profile', { method: 'PUT', body: payload, token }),
+  changePassword: (payload, token) => apiRequest('/auth/change-password', { method: 'PUT', body: payload, token }),
 };
 
 /** Serialises the list controls into the query string the backend expects. */

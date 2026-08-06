@@ -62,4 +62,92 @@ const login = async (req, res, next) => {
     }
 };
 
-module.exports = { register, login };
+const getProfile = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.user.userId).select('-passwordHash');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        return res.status(200).json({
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                createdAt: user.createdAt,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const updateProfile = async (req, res, next) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ message: errors.array()[0].msg });
+        }
+
+        const { name, email } = req.body;
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (email && email.toLowerCase() !== user.email.toLowerCase()) {
+            const existing = await User.findOne({ email: email.toLowerCase() });
+            if (existing && existing._id.toString() !== user._id.toString()) {
+                return res.status(400).json({ message: 'Email already in use' });
+            }
+            user.email = email.toLowerCase();
+        }
+
+        if (name) {
+            user.name = name.trim();
+        }
+
+        await user.save();
+
+        return res.status(200).json({
+            message: 'Profile updated successfully',
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                createdAt: user.createdAt,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const changePassword = async (req, res, next) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ message: errors.array()[0].msg });
+        }
+
+        const { currentPassword, newPassword } = req.body;
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const match = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!match) {
+            return res.status(400).json({ message: 'Current password is incorrect' });
+        }
+
+        user.passwordHash = await bcrypt.hash(newPassword, 12);
+        await user.save();
+
+        return res.status(200).json({ message: 'Password updated successfully' });
+    } catch (err) {
+        next(err);
+    }
+};
+
+module.exports = { register, login, getProfile, updateProfile, changePassword };
+

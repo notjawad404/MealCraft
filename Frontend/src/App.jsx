@@ -10,6 +10,7 @@ import RecipeDetail from './components/RecipeDetail';
 import MyRecipes from './components/MyRecipes';
 import AddRecipe from './components/AddRecipe';
 import EditRecipe from './components/EditRecipe';
+import Profile from './components/Profile';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="/add" element={<AddRecipe />} />
               <Route path="/my-recipes" element={<MyRecipes />} />
               <Route path="/recipes/:id/edit" element={<EditRecipe />} />
+              <Route path="/profile" element={<Profile />} />
             </Route>
           </Route>
         </Routes>

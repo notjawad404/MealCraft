@@ -76,15 +76,22 @@ export default function Navbar() {
               <Link to="/add" className="btn-primary ml-2 px-5 py-2.5">
                 Share a recipe
               </Link>
-              <span
-                className="ml-3 flex items-center gap-2 rounded-full border border-ink-200 py-1 pl-1 pr-3 dark:border-night-600"
-                title={user?.email}
+              <NavLink
+                to="/profile"
+                className={({ isActive }) =>
+                  `ml-3 flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 transition-colors ${
+                    isActive
+                      ? 'border-ember-600 bg-ember-50/60 text-ember-700 dark:border-ember-400 dark:bg-night-800 dark:text-ember-300'
+                      : 'border-ink-200 hover:border-ember-500 dark:border-night-600 dark:hover:border-ember-400'
+                  }`
+                }
+                title="View & edit profile"
               >
                 <Avatar name={user?.name} />
                 <span className="max-w-[9rem] truncate text-sm font-medium text-ink-800 dark:text-ink-100">
                   {user?.name}
                 </span>
-              </span>
+              </NavLink>
               <button
                 type="button"
                 onClick={handleLogout}
@@ -136,17 +143,30 @@ export default function Navbar() {
         >
           <div className="shell flex flex-col gap-1 py-4">
             {isAuthenticated && (
-              <div className="mb-2 flex items-center gap-3 rounded-2xl border border-ink-200 px-4 py-3 dark:border-night-600">
-                <Avatar name={user?.name} />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-ink-900 dark:text-paper-50">
-                    {user?.name}
+              <NavLink
+                to="/profile"
+                onClick={close}
+                className={({ isActive }) =>
+                  `mb-2 flex items-center justify-between rounded-2xl border px-4 py-3 transition-colors ${
+                    isActive
+                      ? 'border-ember-600 bg-ember-50/60 text-ember-700 dark:border-ember-400 dark:bg-night-800 dark:text-ember-300'
+                      : 'border-ink-200 hover:border-ember-500 dark:border-night-600 dark:hover:border-ember-400'
+                  }`
+                }
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar name={user?.name} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-ink-900 dark:text-paper-50">
+                      {user?.name}
+                    </span>
+                    <span className="block truncate text-xs text-ink-500 dark:text-ink-400">
+                      {user?.email}
+                    </span>
                   </span>
-                  <span className="block truncate text-xs text-ink-500 dark:text-ink-400">
-                    {user?.email}
-                  </span>
-                </span>
-              </div>
+                </div>
+                <span className="text-xs font-medium text-ember-600 dark:text-ember-300">View profile</span>
+              </NavLink>
             )}
 
             {links.map(({ to, label }) => (
