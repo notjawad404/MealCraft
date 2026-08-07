@@ -70,6 +70,8 @@ app.use(async (req, res, next) => {
 
 app.use('/recipe', require('./routes/recipeRoutes.js'));
 app.use('/auth', require('./routes/authRoutes.js'));
+app.use('/api/cookbooks', require('./routes/cookbookRoutes.js'));
+app.use('/cookbooks', require('./routes/cookbookRoutes.js'));
 
 app.use((req, res) => {
     res.status(404).json({ success: false, message: `Not found: ${req.method} ${req.originalUrl}` });

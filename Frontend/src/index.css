@@ -182,3 +182,136 @@
   pointer-events: none;
 }
 
+/* ================= PRINT & PDF EXPORT STYLES ================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 12mm 12mm;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #17130F !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide header, navigation, floating controls, and print-hidden elements */
+  header,
+  nav,
+  footer,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Reset outer shell containers */
+  .shell {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Page break controls */
+  .pdf-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  /* Prevent blocks from breaking awkwardly across pages */
+  .pdf-keep-together {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Clean PDF sheet layout */
+  .pdf-page-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    color: #17130F !important;
+    min-height: 270mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    page-break-inside: avoid;
+  }
+
+  /* Force light backgrounds and dark text for PDF export regardless of dark mode */
+  .pdf-page-sheet,
+  .pdf-page-sheet h1,
+  .pdf-page-sheet h2,
+  .pdf-page-sheet h3,
+  .pdf-page-sheet p,
+  .pdf-page-sheet span,
+  .pdf-page-sheet div {
+    color: #17130F !important;
+  }
+
+  .pdf-box-ingredients,
+  .pdf-box-instructions {
+    background-color: #F7F3EC !important;
+    color: #17130F !important;
+    border: 1px solid #E3D9CC !important;
+  }
+
+  .pdf-box-notes {
+    background-color: #FDF2EE !important;
+    color: #5F2615 !important;
+    border-left: 4px solid #D2542C !important;
+    border-top: 1px solid #FBE1D8 !important;
+    border-right: 1px solid #FBE1D8 !important;
+    border-bottom: 1px solid #FBE1D8 !important;
+  }
+
+  /* Dynamic PDF target-counter for Table of Contents index */
+  .pdf-toc-page-num-screen {
+    display: none !important;
+  }
+
+  .pdf-toc-page-num-print {
+    display: inline !important;
+  }
+
+  .pdf-toc-page-num-print::after {
+    content: "Page " target-counter(attr(data-target), page) !important;
+    font-weight: bold;
+    font-family: monospace;
+    color: #B4411F !important;
+  }
+
+  /* Dynamic PDF page counter for footers */
+  .pdf-footer-page-num-screen {
+    display: none !important;
+  }
+
+  .pdf-footer-page-num-print {
+    display: inline !important;
+  }
+
+  .pdf-footer-page-num-print::after {
+    content: "Page " counter(page) !important;
+    font-weight: bold;
+    font-family: monospace;
+    color: #B4411F !important;
+  }
+}
+
+
+
+

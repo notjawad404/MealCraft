@@ -144,3 +144,18 @@ export const recipeApi = {
   /** `{ likes: [id], favourites: [id] }` for the signed-in user. */
   saved: (token, { signal } = {}) => apiRequest('/recipe/saved/ids', { token, signal }),
 };
+
+export const cookbookApi = {
+  list: ({ search, signal } = {}) =>
+    apiRequest(`/api/cookbooks${search ? `?search=${encodeURIComponent(search)}` : ''}`, { signal }),
+  mine: (token, { signal } = {}) =>
+    apiRequest('/api/cookbooks/my-cookbooks', { token, signal }),
+  get: (id, { token, signal } = {}) =>
+    apiRequest(`/api/cookbooks/${id}`, { token, signal }),
+  create: (payload, token) =>
+    apiRequest('/api/cookbooks', { method: 'POST', body: payload, token }),
+  update: (id, payload, token) =>
+    apiRequest(`/api/cookbooks/${id}`, { method: 'PUT', body: payload, token }),
+  remove: (id, token) =>
+    apiRequest(`/api/cookbooks/${id}`, { method: 'DELETE', token }),
+};

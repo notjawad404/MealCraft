@@ -8,6 +8,7 @@ import useAuth from '../../hooks/useAuth';
 const publicLinks = [
   { to: '/', label: 'Home' },
   { to: '/recipes', label: 'Recipes' },
+  { to: '/cookbooks', label: 'Cookbooks' },
 ];
 
 const memberLinks = [
