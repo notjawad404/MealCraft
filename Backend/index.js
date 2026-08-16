@@ -48,6 +48,9 @@ const corsOptions = {
 // cors() answers preflight OPTIONS itself; no app.options() route is needed.
 app.use(cors(corsOptions));
 
+// Must precede express.json(): the webhook verifies against unparsed bytes.
+app.use('/stripe/webhook', express.raw({ type: 'application/json' }));
+
 // Photos go through middleware/recipeUpload.js, not this body parser.
 app.use(express.json({ limit: '512kb' }));
 
@@ -72,6 +75,8 @@ app.use('/recipe', require('./routes/recipeRoutes.js'));
 app.use('/auth', require('./routes/authRoutes.js'));
 app.use('/api/cookbooks', require('./routes/cookbookRoutes.js'));
 app.use('/cookbooks', require('./routes/cookbookRoutes.js'));
+app.use('/connect', require('./routes/connectRoutes.js'));
+app.use('/stripe', require('./routes/webhookRoutes.js'));
 
 app.use((req, res) => {
     res.status(404).json({ success: false, message: `Not found: ${req.method} ${req.originalUrl}` });

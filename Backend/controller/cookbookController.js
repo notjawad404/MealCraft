@@ -1,6 +1,29 @@
 const Cookbook = require('../model/cookbookModel');
 const User = require('../model/userModel');
 const Recipe = require('../model/recipeModel');
+const {
+  hasCookbookAccess,
+  getPurchasedCookbookIds,
+  presentCookbook,
+} = require('../utils/cookbookAccess');
+
+const MIN_PAID_PRICE = 1;
+
+/** Returns an error message when a cookbook cannot go on sale, or null when it can. */
+async function validateSaleReadiness({ price, isPublished, authorId }) {
+  if (!(price > 0) || !isPublished) return null;
+
+  if (price < MIN_PAID_PRICE) {
+    return `Paid cookbooks must be priced at $${MIN_PAID_PRICE.toFixed(2)} or more.`;
+  }
+
+  const author = await User.findById(authorId).select('stripeAccountId stripePayoutsEnabled');
+  if (!author?.stripeAccountId || !author.stripePayoutsEnabled) {
+    return 'Connect your Stripe account from your profile before publishing a paid cookbook.';
+  }
+
+  return null;
+}
 
 // Calculate page numbers and Table of Contents index dynamically
 const buildTableOfContents = async (recipeItems) => {
@@ -86,6 +109,14 @@ const createCookbook = async (req, res, next) => {
 
     const { formattedRecipes, tableOfContents } = await buildTableOfContents(parsedRecipes || []);
 
+    const willPublish = isPublished !== undefined ? Boolean(isPublished) : true;
+    const saleError = await validateSaleReadiness({
+      price: Math.max(0, numericPrice),
+      isPublished: willPublish,
+      authorId: req.user.userId,
+    });
+    if (saleError) return res.status(400).json({ message: saleError });
+
     const cookbook = await Cookbook.create({
       title: title.trim(),
       description: description ? description.trim() : '',
@@ -99,7 +130,7 @@ const createCookbook = async (req, res, next) => {
       recipes: formattedRecipes,
       tableOfContents,
       author: req.user.userId,
-      isPublished: isPublished !== undefined ? Boolean(isPublished) : true,
+      isPublished: willPublish,
     });
 
     const populated = await Cookbook.findById(cookbook._id)
@@ -128,9 +159,19 @@ const getAllCookbooks = async (req, res, next) => {
     const cookbooks = await Cookbook.find(filter)
       .populate('author', 'name email')
       .populate('recipes.recipe', 'title thumbnail time servings calories')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    return res.status(200).json(cookbooks);
+    const userId = req.user?.userId;
+    const purchased = await getPurchasedCookbookIds(userId);
+
+    const presented = cookbooks.map((cookbook) => {
+      const isAuthor = userId && String(cookbook.author?._id ?? cookbook.author) === String(userId);
+      const access = !(cookbook.price > 0) || isAuthor || purchased.has(String(cookbook._id));
+      return presentCookbook(cookbook, access);
+    });
+
+    return res.status(200).json(presented);
   } catch (err) {
     next(err);
   }
@@ -152,7 +193,9 @@ const getCookbookById = async (req, res, next) => {
       return res.status(404).json({ message: 'Cookbook not found' });
     }
 
-    return res.status(200).json(cookbook);
+    const access = await hasCookbookAccess(cookbook, req.user?.userId);
+
+    return res.status(200).json(presentCookbook(cookbook, access));
   } catch (err) {
     next(err);
   }
@@ -164,9 +207,10 @@ const getMyCookbooks = async (req, res, next) => {
     const cookbooks = await Cookbook.find({ author: req.user.userId })
       .populate('author', 'name email')
       .populate('recipes.recipe', 'title thumbnail time')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    return res.status(200).json(cookbooks);
+    return res.status(200).json(cookbooks.map((cookbook) => presentCookbook(cookbook, true)));
   } catch (err) {
     next(err);
   }
@@ -198,6 +242,13 @@ const updateCookbook = async (req, res, next) => {
       pdfPublicId,
       isPublished,
     } = req.body;
+
+    const saleError = await validateSaleReadiness({
+      price: price !== undefined ? Math.max(0, Number(price) || 0) : cookbook.price,
+      isPublished: isPublished !== undefined ? Boolean(isPublished) : cookbook.isPublished,
+      authorId: cookbook.author,
+    });
+    if (saleError) return res.status(400).json({ message: saleError });
 
     if (title) cookbook.title = title.trim();
     if (description !== undefined) cookbook.description = description.trim();

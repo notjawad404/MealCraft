@@ -1,18 +1,52 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { cookbookApi } from '../../lib/api';
 import useAuth from '../../hooks/useAuth';
+
+const formatPrice = (amount, currency = 'usd') => {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount);
+  } catch {
+    return `$${Number(amount).toFixed(2)}`;
+  }
+};
 
 export default function CookbookDetail() {
   const { id } = useParams();
   const { user, token } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [cookbook, setCookbook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [calculatedIndex, setCalculatedIndex] = useState([]);
+
+  const [buying, setBuying] = useState(false);
+  const [buyError, setBuyError] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [cancelled, setCancelled] = useState(false);
+
+  const loadCookbook = useCallback(
+    async ({ quiet = false } = {}) => {
+      if (!quiet) setLoading(true);
+      try {
+        const data = await cookbookApi.get(id, { token });
+        setCookbook(data);
+        return data;
+      } catch (err) {
+        setError(err.message || 'Failed to load cookbook');
+        return null;
+      } finally {
+        if (!quiet) setLoading(false);
+      }
+    },
+    [id, token],
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -34,9 +68,92 @@ export default function CookbookDetail() {
     };
   }, [id, token]);
 
+  useEffect(() => {
+    const outcome = searchParams.get('checkout');
+    if (!outcome) return;
+
+    const sessionId = searchParams.get('session_id');
+
+    const clearQuery = () => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('checkout');
+      next.delete('session_id');
+      setSearchParams(next, { replace: true });
+    };
+
+    if (outcome === 'cancelled') {
+      setCancelled(true);
+      clearQuery();
+      return;
+    }
+
+    if (outcome !== 'success' || !sessionId || !token) {
+      clearQuery();
+      return;
+    }
+
+    let isMounted = true;
+    setConfirming(true);
+
+    cookbookApi
+      .confirmPurchase(sessionId, token)
+      .catch(() => null)
+      .then(() => (isMounted ? loadCookbook({ quiet: true }) : null))
+      .finally(() => {
+        if (!isMounted) return;
+        setConfirming(false);
+        clearQuery();
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [searchParams, setSearchParams, token, loadCookbook]);
+
+  const handleBuy = async () => {
+    setBuyError('');
+
+    if (!user) {
+      navigate('/login', { state: { from: `/cookbooks/${id}` } });
+      return;
+    }
+
+    try {
+      setBuying(true);
+      const { url } = await cookbookApi.checkout(id, token);
+      window.location.href = url;
+    } catch (err) {
+      setBuyError(err.message || 'Could not start checkout. Please try again.');
+      setBuying(false);
+    }
+  };
+
   // Calculate exact physical page numbers dynamically based on content length
   useEffect(() => {
     if (!cookbook || !cookbook.recipes) return;
+
+    // A locked cookbook has no recipe bodies to measure; use the stored index.
+    if (cookbook.isLocked) {
+      const toc = cookbook.tableOfContents || [];
+
+      setCalculatedIndex(
+        toc.map((entry, idx) => {
+          const startPage = entry.pageNumber;
+          const next = toc[idx + 1];
+          const endPage = next ? Math.max(startPage, next.pageNumber - 1) : startPage;
+
+          return {
+            recipeId: cookbook.recipes[idx]?.recipe?._id || `toc-${idx}`,
+            title: entry.title,
+            isPublic: cookbook.recipes[idx]?.recipe?.isPublic,
+            startPage,
+            endPage,
+            pageSpan: endPage - startPage + 1,
+          };
+        }),
+      );
+      return;
+    }
 
     let currentPage = 3; // Page 1: Cover Page, Page 2: Table of Contents Index
 
@@ -109,6 +226,56 @@ export default function CookbookDetail() {
 
   const isAuthor = user && (cookbook.author?._id === user.id || cookbook.author === user.id);
   const recipesList = cookbook.recipes || [];
+  const isLocked = Boolean(cookbook.isLocked);
+  const priceLabel = formatPrice(cookbook.price || 0, cookbook.currency);
+
+  const purchasePanel = (
+    <div className="print:hidden mx-auto max-w-[850px]">
+      <div className="surface rounded-2xl border-2 border-ember-500/40 p-6 sm:p-8 text-center">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-ember-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-ember-700 dark:text-ember-300">
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          Locked
+        </span>
+
+        <h2 className="mt-4 text-2xl font-bold text-ink-900 dark:text-ink-50">
+          Unlock all {cookbook.recipeCount ?? recipesList.length} recipes
+        </h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-ink-600 dark:text-ink-300">
+          You&rsquo;re seeing the cover and contents. Buy the cookbook to read every
+          recipe in full, along with {cookbook.author?.name || 'the author'}&rsquo;s
+          notes for each one.
+        </p>
+
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <div className="text-4xl font-extrabold tracking-tight text-ink-900 dark:text-ink-50">
+            {priceLabel}
+          </div>
+
+          <button
+            onClick={handleBuy}
+            disabled={buying || confirming}
+            className="btn btn-primary w-full max-w-xs justify-center shadow-lg disabled:opacity-60"
+          >
+            {buying ? 'Redirecting to checkout…' : `Buy for ${priceLabel}`}
+          </button>
+
+          <p className="text-xs text-ink-500 dark:text-ink-400">
+            {user
+              ? 'Secure payment through Stripe. One-time purchase, yours forever.'
+              : 'You’ll be asked to sign in first.'}
+          </p>
+        </div>
+
+        {buyError && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+            {buyError}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="shell py-8">
@@ -127,15 +294,28 @@ export default function CookbookDetail() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={handlePrintPDF}
-            className="btn btn-primary flex items-center gap-2 shadow"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Print / Download PDF Book
-          </button>
+          {isLocked ? (
+            <button
+              onClick={handleBuy}
+              disabled={buying || confirming}
+              className="btn btn-primary flex items-center gap-2 shadow disabled:opacity-60"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              {buying ? 'Redirecting…' : `Buy for ${priceLabel}`}
+            </button>
+          ) : (
+            <button
+              onClick={handlePrintPDF}
+              className="btn btn-primary flex items-center gap-2 shadow"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Print / Download PDF Book
+            </button>
+          )}
 
           {isAuthor && (
             <>
@@ -153,6 +333,24 @@ export default function CookbookDetail() {
           )}
         </div>
       </div>
+
+      {confirming && (
+        <div className="print:hidden mb-6 rounded-xl border border-ember-200 bg-ember-50 p-4 text-center text-sm font-semibold text-ember-800 dark:border-ember-900/50 dark:bg-ember-950/40 dark:text-ember-200">
+          Confirming your purchase&hellip; this usually takes a second.
+        </div>
+      )}
+
+      {cancelled && (
+        <div className="print:hidden mb-6 flex items-center justify-between gap-4 rounded-xl border border-ink-200 bg-paper-100 p-4 text-sm text-ink-700 dark:border-night-700 dark:bg-night-800 dark:text-ink-200">
+          <span>Checkout cancelled — you have not been charged.</span>
+          <button
+            onClick={() => setCancelled(false)}
+            className="text-xs font-semibold text-ember-700 hover:underline dark:text-ember-400"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Custom Uploaded PDF Mode */}
       {cookbook.pdfType === 'uploaded' && cookbook.pdfUrl ? (
@@ -236,11 +434,16 @@ export default function CookbookDetail() {
                 </div>
 
                 {/* Auto-Aligning Recipe Page Index */}
-                {calculatedIndex.map((indexItem, idx) => (
-                  <a
+                {calculatedIndex.map((indexItem, idx) => {
+                  const Row = isLocked ? 'div' : 'a';
+                  const linkProps = isLocked
+                    ? {}
+                    : { href: `#recipe-page-${idx}`, 'data-target': `#recipe-page-${idx}` };
+
+                  return (
+                  <Row
                     key={indexItem.recipeId}
-                    href={`#recipe-page-${idx}`}
-                    data-target={`#recipe-page-${idx}`}
+                    {...linkProps}
                     className="pdf-keep-together group flex items-baseline justify-between text-base font-semibold text-ink-900 dark:text-ink-100 hover:text-ember-600 dark:hover:text-ember-400 transition-colors"
                   >
                     <span className="flex items-center gap-2">
@@ -259,8 +462,9 @@ export default function CookbookDetail() {
                       </span>
                       <span className="pdf-toc-page-num-print hidden" data-target={`#recipe-page-${idx}`}></span>
                     </span>
-                  </a>
-                ))}
+                  </Row>
+                  );
+                })}
               </div>
             </div>
 
@@ -269,8 +473,10 @@ export default function CookbookDetail() {
             </div>
           </div>
 
+          {isLocked && purchasePanel}
+
           {/* ================= PAGE 3+: DETAILED RECIPE PAGES ================= */}
-          {recipesList.map((item, idx) => {
+          {!isLocked && recipesList.map((item, idx) => {
             const recipe = item.recipe || item;
             const indexInfo = calculatedIndex[idx] || {};
             const startPage = indexInfo.startPage || idx + 3;

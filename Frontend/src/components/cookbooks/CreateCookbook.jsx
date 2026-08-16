@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { recipeApi, cookbookApi } from '../../lib/api';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { recipeApi, cookbookApi, connectApi } from '../../lib/api';
 import useAuth from '../../hooks/useAuth';
 
 export default function CreateCookbook() {
@@ -25,6 +25,20 @@ export default function CreateCookbook() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const [payoutStatus, setPayoutStatus] = useState(null);
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    const controller = new AbortController();
+    connectApi
+      .status(token, { signal: controller.signal })
+      .then(setPayoutStatus)
+      .catch(() => null);
+
+    return () => controller.abort();
+  }, [token]);
 
   // Load user's recipes and existing cookbook data if editing
   useEffect(() => {
@@ -230,7 +244,22 @@ export default function CreateCookbook() {
                 onChange={(e) => setPrice(e.target.value)}
                 className="field"
               />
-              <p className="mt-1 text-xs text-ink-500">Set 0 for a free cookbook.</p>
+              <p className="mt-1 text-xs text-ink-500">
+                Set 0 for a free cookbook. Paid cookbooks start at $1.00.
+              </p>
+
+              {Number(price) > 0 && payoutStatus && !payoutStatus.payoutsEnabled && (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+                  <p className="font-semibold">Connect Stripe to charge for this cookbook.</p>
+                  <p className="mt-1">
+                    You can save it as a draft now, but publishing at a price needs a
+                    payout account.{' '}
+                    <Link to="/profile" className="font-semibold underline">
+                      Set up payouts
+                    </Link>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -158,4 +158,20 @@ export const cookbookApi = {
     apiRequest(`/api/cookbooks/${id}`, { method: 'PUT', body: payload, token }),
   remove: (id, token) =>
     apiRequest(`/api/cookbooks/${id}`, { method: 'DELETE', token }),
+
+  checkout: (id, token) =>
+    apiRequest(`/api/cookbooks/${id}/checkout`, { method: 'POST', token }),
+
+  confirmPurchase: (sessionId, token) =>
+    apiRequest('/api/cookbooks/purchases/confirm', {
+      method: 'POST',
+      body: { sessionId },
+      token,
+    }),
+};
+
+export const connectApi = {
+  onboard: (token) => apiRequest('/connect/onboard', { method: 'POST', token }),
+  status: (token, { signal } = {}) => apiRequest('/connect/status', { token, signal }),
+  dashboard: (token) => apiRequest('/connect/dashboard', { token }),
 };

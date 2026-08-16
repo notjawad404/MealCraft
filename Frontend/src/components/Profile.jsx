@@ -4,6 +4,7 @@ import { authApi } from '../lib/api';
 import PageHeader from './common/PageHeader';
 import Field from './auth/Field';
 import FormAlert from './common/FormAlert';
+import PayoutSettings from './cookbooks/PayoutSettings';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -27,7 +28,10 @@ function validatePassword({ currentPassword, newPassword, confirmPassword }) {
 
 export default function Profile() {
   const { user, token, updateProfile, changePassword } = useAuth();
-  const [activeTab, setActiveTab] = useState('personal'); // 'personal' | 'security'
+  // 'personal' | 'security' | 'payouts'
+  const [activeTab, setActiveTab] = useState(() =>
+    new URLSearchParams(window.location.search).has('stripe') ? 'payouts' : 'personal',
+  );
 
   // Profile Form state
   const [profileData, setProfileData] = useState({
@@ -238,6 +242,26 @@ export default function Profile() {
           </svg>
           Change Password
         </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'payouts'}
+          aria-controls="tabpanel-payouts"
+          id="tab-payouts"
+          onClick={() => setActiveTab('payouts')}
+          className={`flex items-center gap-2.5 border-b-2 px-6 py-3.5 text-sm font-semibold transition-colors ${
+            activeTab === 'payouts'
+              ? 'border-ember-600 text-ember-700 dark:border-ember-400 dark:text-ember-300'
+              : 'border-transparent text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-paper-50'
+          }`}
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="2" y="5" width="20" height="14" rx="2" />
+            <path d="M2 10h20" />
+          </svg>
+          Payouts
+        </button>
       </div>
 
       {/* Tab Panels */}
@@ -411,6 +435,18 @@ export default function Profile() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Payouts Tab */}
+        {activeTab === 'payouts' && (
+          <div
+            role="tabpanel"
+            id="tabpanel-payouts"
+            aria-labelledby="tab-payouts"
+            className="pt-8"
+          >
+            <PayoutSettings />
           </div>
         )}
       </div>
