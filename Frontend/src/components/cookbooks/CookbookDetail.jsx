@@ -28,8 +28,12 @@ export default function CookbookDetail() {
 
   const [buying, setBuying] = useState(false);
   const [buyError, setBuyError] = useState('');
-  const [confirming, setConfirming] = useState(false);
   const [cancelled, setCancelled] = useState(false);
+
+  // '' | 'confirming' | 'paid' | 'settling'. Anything non-empty means Stripe has
+  // already taken the money, which is what keeps the buy button off the page.
+  const [purchaseState, setPurchaseState] = useState('');
+  const [sessionToConfirm, setSessionToConfirm] = useState('');
 
   const loadCookbook = useCallback(
     async ({ quiet = false } = {}) => {
@@ -68,47 +72,86 @@ export default function CookbookDetail() {
     };
   }, [id, token]);
 
+  // Split from the polling below so clearing the query string cannot tear down
+  // an in-flight confirmation by re-running that effect.
   useEffect(() => {
     const outcome = searchParams.get('checkout');
     if (!outcome) return;
 
     const sessionId = searchParams.get('session_id');
 
-    const clearQuery = () => {
-      const next = new URLSearchParams(searchParams);
-      next.delete('checkout');
-      next.delete('session_id');
-      setSearchParams(next, { replace: true });
-    };
-
     if (outcome === 'cancelled') {
       setCancelled(true);
-      clearQuery();
-      return;
+    } else if (outcome === 'success' && sessionId && token) {
+      setPurchaseState('confirming');
+      setSessionToConfirm(sessionId);
     }
 
-    if (outcome !== 'success' || !sessionId || !token) {
-      clearQuery();
-      return;
-    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('checkout');
+    next.delete('session_id');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, token]);
 
+  // Stripe redirects back the moment the payment is taken, but Link and bank
+  // debits are only settled once their balance transaction posts a minute or so
+  // later. Poll instead of asking once, so access appears on its own.
+  useEffect(() => {
+    if (!sessionToConfirm || !token) return;
+
+    const delays = [0, 1000, 2000, 3000, 5000, 5000, 8000, 8000];
     let isMounted = true;
-    setConfirming(true);
+    let timer;
 
-    cookbookApi
-      .confirmPurchase(sessionId, token)
-      .catch(() => null)
-      .then(() => (isMounted ? loadCookbook({ quiet: true }) : null))
-      .finally(() => {
-        if (!isMounted) return;
-        setConfirming(false);
-        clearQuery();
-      });
+    const attempt = async (index) => {
+      let paid = false;
+
+      try {
+        const result = await cookbookApi.confirmPurchase(sessionToConfirm, token);
+        paid = Boolean(result?.paid);
+      } catch {
+        // The webhook settles the order regardless; just try again.
+      }
+
+      if (!isMounted) return;
+
+      if (paid) {
+        await loadCookbook({ quiet: true });
+        if (isMounted) setPurchaseState('paid');
+        return;
+      }
+
+      if (index + 1 < delays.length) {
+        timer = setTimeout(() => attempt(index + 1), delays[index + 1]);
+        return;
+      }
+
+      // Out of patience, not out of luck: the webhook still has it in hand.
+      const data = await loadCookbook({ quiet: true });
+      if (isMounted) setPurchaseState(data && !data.isLocked ? 'paid' : 'settling');
+    };
+
+    attempt(0);
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
-  }, [searchParams, setSearchParams, token, loadCookbook]);
+  }, [sessionToConfirm, token, loadCookbook]);
+
+  const recheckPurchase = useCallback(async () => {
+    if (!sessionToConfirm || !token) return;
+
+    setPurchaseState('confirming');
+
+    try {
+      const result = await cookbookApi.confirmPurchase(sessionToConfirm, token);
+      const data = await loadCookbook({ quiet: true });
+      setPurchaseState(result?.paid || (data && !data.isLocked) ? 'paid' : 'settling');
+    } catch {
+      setPurchaseState('settling');
+    }
+  }, [sessionToConfirm, token, loadCookbook]);
 
   const handleBuy = async () => {
     setBuyError('');
@@ -229,6 +272,43 @@ export default function CookbookDetail() {
   const isLocked = Boolean(cookbook.isLocked);
   const priceLabel = formatPrice(cookbook.price || 0, cookbook.currency);
 
+  const justPurchased = purchaseState === 'paid';
+  // Once Stripe has the money the buy button never comes back, even if the
+  // unlock is late — re-offering it is precisely how a buyer pays twice.
+  const awaitingAccess = Boolean(purchaseState) && isLocked;
+
+  const settlingPanel = (
+    <div className="print:hidden mx-auto max-w-[850px]">
+      <div className="surface rounded-2xl border-2 border-emerald-500/40 p-6 sm:p-8 text-center">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Payment received
+        </span>
+
+        <h2 className="mt-4 text-2xl font-bold text-ink-900 dark:text-ink-50">
+          {priceLabel} paid — unlocking your cookbook
+        </h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-ink-600 dark:text-ink-300">
+          {purchaseState === 'settling'
+            ? 'Your bank is taking a moment to settle this one. Your access will appear on its own — please don’t pay again.'
+            : 'Confirming with Stripe. This usually takes a second.'}
+        </p>
+
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <button
+            onClick={recheckPurchase}
+            disabled={purchaseState === 'confirming'}
+            className="btn btn-primary w-full max-w-xs justify-center shadow-lg disabled:opacity-60"
+          >
+            {purchaseState === 'confirming' ? 'Confirming…' : 'Check again'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   const purchasePanel = (
     <div className="print:hidden mx-auto max-w-[850px]">
       <div className="surface rounded-2xl border-2 border-ember-500/40 p-6 sm:p-8 text-center">
@@ -255,7 +335,7 @@ export default function CookbookDetail() {
 
           <button
             onClick={handleBuy}
-            disabled={buying || confirming}
+            disabled={buying}
             className="btn btn-primary w-full max-w-xs justify-center shadow-lg disabled:opacity-60"
           >
             {buying ? 'Redirecting to checkout…' : `Buy for ${priceLabel}`}
@@ -294,10 +374,18 @@ export default function CookbookDetail() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {isLocked ? (
+          {awaitingAccess ? (
+            <span className="btn btn-primary pointer-events-none flex items-center gap-2 opacity-70 shadow">
+              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              Unlocking&hellip;
+            </span>
+          ) : isLocked ? (
             <button
               onClick={handleBuy}
-              disabled={buying || confirming}
+              disabled={buying}
               className="btn btn-primary flex items-center gap-2 shadow disabled:opacity-60"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -334,9 +422,40 @@ export default function CookbookDetail() {
         </div>
       </div>
 
-      {confirming && (
-        <div className="print:hidden mb-6 rounded-xl border border-ember-200 bg-ember-50 p-4 text-center text-sm font-semibold text-ember-800 dark:border-ember-900/50 dark:bg-ember-950/40 dark:text-ember-200">
-          Confirming your purchase&hellip; this usually takes a second.
+      {purchaseState === 'confirming' && (
+        <div className="print:hidden mb-6 flex items-center justify-center gap-2 rounded-xl border border-ember-200 bg-ember-50 p-4 text-center text-sm font-semibold text-ember-800 dark:border-ember-900/50 dark:bg-ember-950/40 dark:text-ember-200">
+          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+          Payment received — confirming with Stripe&hellip;
+        </div>
+      )}
+
+      {justPurchased && (
+        <div className="print:hidden mb-6 flex items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <span className="flex items-center gap-2">
+            <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Payment confirmed — this cookbook is yours. Enjoy every recipe.
+          </span>
+          <button
+            onClick={() => setPurchaseState('')}
+            className="text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {purchaseState === 'settling' && (
+        <div className="print:hidden mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+          <p className="font-semibold">Payment received — your access is on its way.</p>
+          <p className="mt-1">
+            Bank-backed methods like Link can take a minute to settle. This page unlocks
+            itself once it does, so there&rsquo;s no need to pay again.
+          </p>
         </div>
       )}
 
@@ -473,7 +592,7 @@ export default function CookbookDetail() {
             </div>
           </div>
 
-          {isLocked && purchasePanel}
+          {isLocked && (awaitingAccess ? settlingPanel : purchasePanel)}
 
           {/* ================= PAGE 3+: DETAILED RECIPE PAGES ================= */}
           {!isLocked && recipesList.map((item, idx) => {
