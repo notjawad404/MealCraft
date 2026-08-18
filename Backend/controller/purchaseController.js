@@ -35,52 +35,62 @@ async function resolveStripeFee(charge) {
     return full?.fee ?? null;
 }
 
-async function settleOrder(order, charge) {
-    const stripe = getStripe();
-    const stripeFee = await resolveStripeFee(charge);
+// Buyer access and seller payout settle on different clocks. Link and bank
+// debits leave balance_transaction null on charge.succeeded, so the Stripe fee
+// -- and therefore the transfer amount -- is only knowable once charge.updated
+// lands, often a minute or two later. Access must never wait on that.
+async function payOutSeller(order, charge) {
+    if (order.stripeTransferId) return;
 
-    if (stripeFee === null) {
-        order.status = 'pending';
-        await order.save();
-        return order;
-    }
+    const stripeFee = await resolveStripeFee(charge);
+    if (stripeFee === null) return; // Retried when charge.updated carries it.
 
     const gross = charge.amount;
     const platformFee = Math.round((gross * getPlatformFeePercent()) / 100);
     const sellerNet = gross - platformFee - stripeFee;
 
-    let transferId = '';
-
-    if (sellerNet > 0 && order.stripeDestinationAccount) {
-        const transfer = await stripe.transfers.create(
-            {
-                amount: sellerNet,
-                currency: order.currency,
-                destination: order.stripeDestinationAccount,
-                source_transaction: charge.id,
-                transfer_group: String(order._id),
-                metadata: {
-                    orderId: String(order._id),
-                    cookbookId: String(order.cookbook),
-                },
-            },
-            { idempotencyKey: `order_transfer_${order._id}` },
-        );
-
-        transferId = transfer.id;
-    }
-
-    order.stripeChargeId = charge.id;
-    order.stripeTransferId = transferId;
-    order.amount = gross;
     order.platformFee = platformFee;
     order.stripeFee = stripeFee;
     order.sellerNet = Math.max(0, sellerNet);
+
+    if (sellerNet <= 0 || !order.stripeDestinationAccount) return;
+
+    const transfer = await getStripe().transfers.create(
+        {
+            amount: sellerNet,
+            currency: order.currency,
+            destination: order.stripeDestinationAccount,
+            source_transaction: charge.id,
+            transfer_group: String(order._id),
+            metadata: {
+                orderId: String(order._id),
+                cookbookId: String(order.cookbook),
+            },
+        },
+        { idempotencyKey: `order_transfer_${order._id}` },
+    );
+
+    order.stripeTransferId = transfer.id;
+}
+
+async function settleOrder(order, charge) {
+    const firstSettlement = order.status !== 'paid';
+
+    order.stripeChargeId = charge.id;
+    order.amount = charge.amount;
     order.status = 'paid';
-    order.paidAt = new Date();
+    if (!order.paidAt) order.paidAt = new Date();
+
+    // Saved before the payout is attempted so a transfer failure can never cost
+    // the buyer the access they have already paid for.
     await order.save();
 
-    await Cookbook.updateOne({ _id: order.cookbook }, { $inc: { salesCount: 1 } });
+    if (firstSettlement) {
+        await Cookbook.updateOne({ _id: order.cookbook }, { $inc: { salesCount: 1 } });
+    }
+
+    await payOutSeller(order, charge);
+    await order.save();
 
     return order;
 }
@@ -134,18 +144,45 @@ async function fulfillOrder(session) {
 }
 
 async function fulfillFromCharge(charge) {
-    const paymentIntentId = idOf(charge?.payment_intent);
-    if (!paymentIntentId) return null;
+    if (charge?.status !== 'succeeded' || !charge.paid || charge.refunded) return null;
 
-    const order = await claimOrder({ stripePaymentIntentId: paymentIntentId });
-    if (!order) return null;
+    const paymentIntentId = idOf(charge.payment_intent);
 
-    try {
-        return await settleOrder(order, charge);
-    } catch (err) {
-        await releaseOrder(order._id);
-        throw err;
+    // charge.succeeded can beat the session handler that persists the payment
+    // intent id, so prefer the order id Stripe carries on the charge itself.
+    const orderId = charge.metadata?.orderId || charge.transfer_group;
+    const filter = orderId
+        ? { _id: orderId }
+        : paymentIntentId
+            ? { stripePaymentIntentId: paymentIntentId }
+            : null;
+
+    if (!filter) return null;
+
+    const order = await claimOrder(filter);
+
+    if (order) {
+        if (!order.stripePaymentIntentId && paymentIntentId) {
+            order.stripePaymentIntentId = paymentIntentId;
+        }
+
+        try {
+            return await settleOrder(order, charge);
+        } catch (err) {
+            await releaseOrder(order._id);
+            throw err;
+        }
     }
+
+    // Paid already, but still owing its transfer: this is the charge.updated
+    // that finally carries the balance transaction the fee is read from.
+    const owing = await Order.findOne({ ...filter, status: 'paid', stripeTransferId: '' });
+    if (!owing) return null;
+
+    await payOutSeller(owing, charge);
+    await owing.save();
+
+    return owing;
 }
 
 async function failOrder(session, reason) {

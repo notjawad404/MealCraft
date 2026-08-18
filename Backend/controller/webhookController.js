@@ -50,7 +50,10 @@ const handleStripeWebhook = async (req, res) => {
                 await failOrder(event.data.object, 'Payment failed');
                 break;
 
+            // charge.updated is the one that carries balance_transaction for Link
+            // and bank debits, so it is what completes a deferred seller payout.
             case 'charge.succeeded':
+            case 'charge.updated':
                 await fulfillFromCharge(event.data.object);
                 break;
 
