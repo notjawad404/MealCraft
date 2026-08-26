@@ -14,12 +14,18 @@ const {
   createCheckoutSession,
   confirmPurchase,
 } = require('../controller/purchaseController');
+const {
+  getMyPurchases,
+  getMySales,
+} = require('../controller/salesController');
 
 router.get('/', optionalAuthenticate, getAllCookbooks);
 router.get('/my-cookbooks', authenticate, getMyCookbooks);
 
-// Ahead of '/:id' so 'purchases' is not read as a cookbook id.
+// Ahead of '/:id' so these are not read as cookbook ids.
 router.post('/purchases/confirm', authenticate, confirmPurchase);
+router.get('/purchases', authenticate, getMyPurchases);
+router.get('/sales', authenticate, getMySales);
 
 router.get('/:id', optionalAuthenticate, getCookbookById);
 router.post('/:id/checkout', authenticate, createCheckoutSession);

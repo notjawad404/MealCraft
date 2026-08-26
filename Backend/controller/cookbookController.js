@@ -2,7 +2,7 @@ const Cookbook = require('../model/cookbookModel');
 const User = require('../model/userModel');
 const Recipe = require('../model/recipeModel');
 const {
-  hasCookbookAccess,
+  resolveAccess,
   getPurchasedCookbookIds,
   presentCookbook,
 } = require('../utils/cookbookAccess');
@@ -166,9 +166,15 @@ const getAllCookbooks = async (req, res, next) => {
     const purchased = await getPurchasedCookbookIds(userId);
 
     const presented = cookbooks.map((cookbook) => {
-      const isAuthor = userId && String(cookbook.author?._id ?? cookbook.author) === String(userId);
-      const access = !(cookbook.price > 0) || isAuthor || purchased.has(String(cookbook._id));
-      return presentCookbook(cookbook, access);
+      const isOwner = Boolean(userId)
+        && String(cookbook.author?._id ?? cookbook.author) === String(userId);
+      const isPurchased = !isOwner && purchased.has(String(cookbook._id));
+
+      return presentCookbook(cookbook, {
+        hasAccess: !(cookbook.price > 0) || isOwner || isPurchased,
+        isOwner,
+        isPurchased,
+      });
     });
 
     return res.status(200).json(presented);
@@ -193,7 +199,7 @@ const getCookbookById = async (req, res, next) => {
       return res.status(404).json({ message: 'Cookbook not found' });
     }
 
-    const access = await hasCookbookAccess(cookbook, req.user?.userId);
+    const access = await resolveAccess(cookbook, req.user?.userId);
 
     return res.status(200).json(presentCookbook(cookbook, access));
   } catch (err) {
@@ -210,7 +216,9 @@ const getMyCookbooks = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    return res.status(200).json(cookbooks.map((cookbook) => presentCookbook(cookbook, true)));
+    return res.status(200).json(
+      cookbooks.map((cookbook) => presentCookbook(cookbook, { hasAccess: true, isOwner: true })),
+    );
   } catch (err) {
     next(err);
   }

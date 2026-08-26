@@ -31,20 +31,41 @@ async function hasCookbookAccess(cookbook, userId) {
     return Boolean(paid);
 }
 
-function presentCookbook(cookbook, hasAccess) {
+// Access alone cannot tell a buyer from an author from a free download, and the
+// listing badge has to say which of the three it is.
+async function resolveAccess(cookbook, userId) {
+    const isOwner = Boolean(userId) && idOf(cookbook?.author) === String(userId);
+
+    const isPurchased = !isOwner && Boolean(userId) && Boolean(
+        await Order.exists({ buyer: userId, cookbook: cookbook._id, status: 'paid' }),
+    );
+
+    return {
+        hasAccess: !(cookbook?.price > 0) || isOwner || isPurchased,
+        isOwner,
+        isPurchased,
+    };
+}
+
+function presentCookbook(cookbook, access) {
     const plain = toPlain(cookbook);
     if (!plain) return plain;
 
+    const { hasAccess, isOwner = false, isPurchased = false } =
+        typeof access === 'boolean' ? { hasAccess: access } : access;
+
     const recipes = Array.isArray(plain.recipes) ? plain.recipes : [];
+    const ownership = { isOwner, isPurchased };
 
     if (hasAccess) {
-        return { ...plain, recipeCount: recipes.length, hasAccess: true, isLocked: false };
+        return { ...plain, ...ownership, recipeCount: recipes.length, hasAccess: true, isLocked: false };
     }
 
     const { pdfUrl, pdfPublicId, ...rest } = plain;
 
     return {
         ...rest,
+        ...ownership,
         pdfUrl: '',
         pdfPublicId: '',
         recipes: recipes.map((item) => {
@@ -68,6 +89,7 @@ function presentCookbook(cookbook, hasAccess) {
 
 module.exports = {
     hasCookbookAccess,
+    resolveAccess,
     getPurchasedCookbookIds,
     presentCookbook,
     isFreeOrOwn,
