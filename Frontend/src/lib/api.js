@@ -146,8 +146,11 @@ export const recipeApi = {
 };
 
 export const cookbookApi = {
-  list: ({ search, signal } = {}) =>
-    apiRequest(`/api/cookbooks${search ? `?search=${encodeURIComponent(search)}` : ''}`, { signal }),
+  list: ({ search, token, signal } = {}) =>
+    apiRequest(`/api/cookbooks${search ? `?search=${encodeURIComponent(search)}` : ''}`, {
+      token,
+      signal,
+    }),
   mine: (token, { signal } = {}) =>
     apiRequest('/api/cookbooks/my-cookbooks', { token, signal }),
   get: (id, { token, signal } = {}) =>
@@ -168,6 +171,12 @@ export const cookbookApi = {
       body: { sessionId },
       token,
     }),
+
+  purchases: (token, { signal } = {}) =>
+    apiRequest('/api/cookbooks/purchases', { token, signal }),
+
+  sales: (token, { signal } = {}) =>
+    apiRequest('/api/cookbooks/sales', { token, signal }),
 };
 
 export const connectApi = {

@@ -3,6 +3,31 @@ import { Link } from 'react-router-dom';
 import { cookbookApi } from '../../lib/api';
 import useAuth from '../../hooks/useAuth';
 
+function StatusBadge({ cookbook }) {
+  const base = 'rounded-full px-3 py-1 text-xs font-bold shadow backdrop-blur';
+
+  const price = (
+    <span className={`${base} bg-paper-50/90 text-ink-900 dark:bg-night-900/90 dark:text-paper-50`}>
+      {cookbook.price > 0 ? `$${cookbook.price.toFixed(2)}` : 'Free'}
+    </span>
+  );
+
+  if (cookbook.isPurchased) {
+    return <span className={`${base} bg-emerald-600/95 text-white`}>Already bought</span>;
+  }
+
+  if (cookbook.isOwner) {
+    return (
+      <>
+        <span className={`${base} bg-ember-600/95 text-white`}>Your cookbook</span>
+        {price}
+      </>
+    );
+  }
+
+  return price;
+}
+
 export default function CookbookList() {
   const { user, token } = useAuth();
   const [cookbooks, setCookbooks] = useState([]);
@@ -23,7 +48,7 @@ export default function CookbookList() {
           const data = await cookbookApi.mine(token);
           if (isMounted) setMyCookbooks(data);
         } else {
-          const data = await cookbookApi.list({ search });
+          const data = await cookbookApi.list({ search, token });
           if (isMounted) setCookbooks(data);
         }
       } catch (err) {
@@ -56,15 +81,23 @@ export default function CookbookList() {
         </div>
 
         {user && (
-          <Link
-            to="/cookbooks/create"
-            className="btn btn-primary shadow-lg hover:shadow-xl flex items-center gap-2"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Create Cookbook
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to="/cookbooks/purchases" className="btn btn-ghost text-sm">
+              My purchases
+            </Link>
+            <Link to="/cookbooks/sales" className="btn btn-ghost text-sm">
+              Sales
+            </Link>
+            <Link
+              to="/cookbooks/create"
+              className="btn btn-primary shadow-lg hover:shadow-xl flex items-center gap-2"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create Cookbook
+            </Link>
+          </div>
         )}
       </div>
 
@@ -156,7 +189,9 @@ export default function CookbookList() {
             <Link
               key={cookbook._id}
               to={`/cookbooks/${cookbook._id}`}
-              className="surface group flex flex-col overflow-hidden rounded-2xl border transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
+              className={`surface group flex flex-col overflow-hidden rounded-2xl border transition-all duration-200 hover:-translate-y-1 hover:shadow-xl ${
+                cookbook.isPurchased ? 'border-emerald-300 dark:border-emerald-800' : ''
+              }`}
             >
               {/* Cover Image / Thumbnail */}
               <div className="relative aspect-[4/3] w-full overflow-hidden bg-ink-100 dark:bg-night-900">
@@ -177,11 +212,8 @@ export default function CookbookList() {
                   </div>
                 )}
 
-                {/* Badge */}
-                <div className="absolute right-3 top-3">
-                  <span className="rounded-full bg-paper-50/90 px-3 py-1 text-xs font-bold text-ink-900 shadow backdrop-blur dark:bg-night-900/90 dark:text-paper-50">
-                    {cookbook.price > 0 ? `$${cookbook.price.toFixed(2)}` : 'Free'}
-                  </span>
+                <div className="absolute right-3 top-3 flex flex-col items-end gap-1.5">
+                  <StatusBadge cookbook={cookbook} />
                 </div>
               </div>
 
@@ -195,7 +227,13 @@ export default function CookbookList() {
                 </p>
 
                 <div className="mt-auto pt-4 flex items-center justify-between text-xs text-ink-500 dark:text-ink-400 border-t border-ink-100 dark:border-night-700">
-                  <span>By {cookbook.author?.name || 'Author'}</span>
+                  {activeTab === 'mine' ? (
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                      {cookbook.salesCount || 0} sold
+                    </span>
+                  ) : (
+                    <span>By {cookbook.author?.name || 'Author'}</span>
+                  )}
                   <span>{cookbook.recipes?.length || 0} Recipes</span>
                 </div>
               </div>

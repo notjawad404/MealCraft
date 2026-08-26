@@ -18,6 +18,8 @@ import Register from './components/auth/Register';
 import CookbookList from './components/cookbooks/CookbookList';
 import CreateCookbook from './components/cookbooks/CreateCookbook';
 import CookbookDetail from './components/cookbooks/CookbookDetail';
+import MyPurchases from './components/cookbooks/MyPurchases';
+import SalesDashboard from './components/cookbooks/SalesDashboard';
 
 export default function App() {
   return (
@@ -50,6 +52,8 @@ export default function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/cookbooks/create" element={<CreateCookbook />} />
                 <Route path="/cookbooks/:id/edit" element={<CreateCookbook />} />
+                <Route path="/cookbooks/purchases" element={<MyPurchases />} />
+                <Route path="/cookbooks/sales" element={<SalesDashboard />} />
               </Route>
             </Route>
           </Routes>

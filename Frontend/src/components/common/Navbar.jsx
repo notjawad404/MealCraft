@@ -23,6 +23,61 @@ const linkClasses = ({ isActive }) =>
        : 'text-ink-600 hover:text-ink-900 dark:text-ink-300 dark:hover:text-paper-50'
    }`;
 
+const ProfileIcon = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+const HeartIcon = (props) => (
+  <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
+  </svg>
+);
+
+const LibraryIcon = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+  </svg>
+);
+
+const SalesIcon = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M3 3v18h18" />
+    <path d="m19 9-5 5-4-4-3 3" />
+  </svg>
+);
+
+const menuLinks = [
+  { to: '/profile', label: 'Profile', Icon: ProfileIcon, iconClass: 'text-ink-500' },
+  { to: '/liked', label: 'Liked recipes', Icon: HeartIcon, iconClass: 'text-red-500 fill-red-500/20' },
+  { to: '/cookbooks/purchases', label: 'My purchases', Icon: LibraryIcon, iconClass: 'text-ember-600 dark:text-ember-400' },
+  { to: '/cookbooks/sales', label: 'Cookbook sales', Icon: SalesIcon, iconClass: 'text-emerald-600 dark:text-emerald-400' },
+];
+
+function MenuLink({ to, label, Icon, iconClass, onClick, onDark }) {
+  return (
+    <NavLink
+      to={to}
+      onClick={onClick}
+      className={({ isActive }) =>
+        `flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
+          isActive
+            ? `bg-ember-50 font-semibold text-ember-700 dark:text-ember-300 ${onDark ? 'dark:bg-night-900' : 'dark:bg-night-800'}`
+            : onDark
+              ? 'text-ink-700 hover:bg-white dark:text-ink-200 dark:hover:bg-night-900'
+              : 'text-ink-700 hover:bg-paper-100 hover:text-ember-700 dark:text-ink-200 dark:hover:bg-night-800 dark:hover:text-ember-300'
+        }`
+      }
+    >
+      <Icon className={`h-4 w-4 ${iconClass}`} />
+      {label}
+    </NavLink>
+  );
+}
+
 function Avatar({ name }) {
   return (
     <span
@@ -140,40 +195,10 @@ export default function Navbar() {
                 {/* Dropdown Menu - pt-1.5 acts as invisible hover bridge */}
                 {userMenuOpen && (
                   <div className="absolute right-0 top-full pt-1.5 z-50">
-                    <div className="w-48 animate-fade-in rounded-2xl border border-ink-200 bg-white p-1.5 shadow-lift backdrop-blur-xl dark:border-night-700 dark:bg-night-900">
-                      <NavLink
-                        to="/profile"
-                        onClick={() => setUserMenuOpen(false)}
-                        className={({ isActive }) =>
-                          `flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
-                            isActive
-                              ? 'bg-ember-50 text-ember-700 dark:bg-night-800 dark:text-ember-300 font-semibold'
-                              : 'text-ink-700 hover:bg-paper-100 hover:text-ember-700 dark:text-ink-200 dark:hover:bg-night-800 dark:hover:text-ember-300'
-                          }`
-                        }
-                      >
-                        <svg viewBox="0 0 24 24" className="h-4 w-4 text-ink-500" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                          <circle cx="12" cy="7" r="4" />
-                        </svg>
-                        Profile
-                      </NavLink>
-                      <NavLink
-                        to="/liked"
-                        onClick={() => setUserMenuOpen(false)}
-                        className={({ isActive }) =>
-                          `flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
-                            isActive
-                              ? 'bg-ember-50 text-ember-700 dark:bg-night-800 dark:text-ember-300 font-semibold'
-                              : 'text-ink-700 hover:bg-paper-100 hover:text-ember-700 dark:text-ink-200 dark:hover:bg-night-800 dark:hover:text-ember-300'
-                          }`
-                        }
-                      >
-                        <svg viewBox="0 0 24 24" className="h-4 w-4 text-red-500 fill-red-500/20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
-                        </svg>
-                        Liked recipes
-                      </NavLink>
+                    <div className="w-56 animate-fade-in rounded-2xl border border-ink-200 bg-white p-1.5 shadow-lift backdrop-blur-xl dark:border-night-700 dark:bg-night-900">
+                      {menuLinks.map((item) => (
+                        <MenuLink key={item.to} {...item} onClick={() => setUserMenuOpen(false)} />
+                      ))}
                     </div>
                   </div>
                 )}
@@ -266,39 +291,9 @@ export default function Navbar() {
 
                 {mobileProfileOpen && (
                   <div className="mt-2.5 flex flex-col gap-1 border-t border-ink-200/80 pt-2.5 dark:border-night-700 animate-fade-in">
-                    <NavLink
-                      to="/profile"
-                      onClick={close}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'bg-ember-50 text-ember-700 dark:bg-night-900 dark:text-ember-300 font-semibold'
-                            : 'text-ink-700 hover:bg-white dark:text-ink-200 dark:hover:bg-night-900'
-                        }`
-                      }
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4 text-ink-500" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M19 21v-2a4 4 0 0 4-4H9a4 4 0 0 4-4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                      Profile
-                    </NavLink>
-                    <NavLink
-                      to="/liked"
-                      onClick={close}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'bg-ember-50 text-ember-700 dark:bg-night-900 dark:text-ember-300 font-semibold'
-                            : 'text-ink-700 hover:bg-white dark:text-ink-200 dark:hover:bg-night-900'
-                        }`
-                      }
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4 text-red-500 fill-red-500/20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
-                      </svg>
-                      Liked recipes
-                    </NavLink>
+                    {menuLinks.map((item) => (
+                      <MenuLink key={item.to} {...item} onClick={close} onDark />
+                    ))}
                   </div>
                 )}
               </div>

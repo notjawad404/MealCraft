@@ -1,18 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { cookbookApi } from '../../lib/api';
+import { formatPrice } from '../../lib/money';
 import useAuth from '../../hooks/useAuth';
-
-const formatPrice = (amount, currency = 'usd') => {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: currency.toUpperCase(),
-    }).format(amount);
-  } catch {
-    return `$${Number(amount).toFixed(2)}`;
-  }
-};
 
 export default function CookbookDetail() {
   const { id } = useParams();
@@ -267,7 +257,7 @@ export default function CookbookDetail() {
     );
   }
 
-  const isAuthor = user && (cookbook.author?._id === user.id || cookbook.author === user.id);
+  const isAuthor = Boolean(cookbook.isOwner);
   const recipesList = cookbook.recipes || [];
   const isLocked = Boolean(cookbook.isLocked);
   const priceLabel = formatPrice(cookbook.price || 0, cookbook.currency);
@@ -394,15 +384,25 @@ export default function CookbookDetail() {
               {buying ? 'Redirecting…' : `Buy for ${priceLabel}`}
             </button>
           ) : (
-            <button
-              onClick={handlePrintPDF}
-              className="btn btn-primary flex items-center gap-2 shadow"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              Print / Download PDF Book
-            </button>
+            <>
+              {cookbook.isPurchased && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Already bought
+                </span>
+              )}
+              <button
+                onClick={handlePrintPDF}
+                className="btn btn-primary flex items-center gap-2 shadow"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print / Download PDF Book
+              </button>
+            </>
           )}
 
           {isAuthor && (
